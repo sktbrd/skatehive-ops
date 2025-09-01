@@ -12,7 +12,7 @@ from rich.align import Align
 
 
 def create_dashboard_layout() -> Layout:
-    """Create the dashboard layout with proper proportions"""
+    """Create the dashboard layout with optimal space distribution"""
     layout = Layout()
     
     layout.split_column(
@@ -22,19 +22,19 @@ def create_dashboard_layout() -> Layout:
     )
     
     layout["main"].split_row(
-        Layout(name="left", ratio=3),
-        Layout(name="right", ratio=2)
+        Layout(name="left", ratio=4),
+        Layout(name="right", ratio=3)
     )
     
     layout["left"].split_column(
-        Layout(name="internet", size=9),
-        Layout(name="services", size=8),
-        Layout(name="hive_stats", size=12)
+        Layout(name="internet", size=10),
+        Layout(name="services", size=9),
+        Layout(name="hive_stats", size=15)
     )
     
     layout["right"].split_column(
-        Layout(name="top_logs"),
-        Layout(name="bottom_logs")
+        Layout(name="top_logs", size=15),
+        Layout(name="bottom_logs", size=15)
     )
     
     return layout

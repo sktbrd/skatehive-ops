@@ -46,47 +46,22 @@ class ServiceMonitor:
     
     def fetch_hive_stats(self) -> Dict:
         """Fetch Hive community stats from API"""
+        # Use urllib (built into Python) instead of requests
         try:
-            response = requests.get("https://stats.hivehub.dev/communities?c=hive-173115", timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                # Validate that we got expected data structure
+            import urllib.request
+            import json
+            
+            with urllib.request.urlopen("https://stats.hivehub.dev/communities?c=hive-173115", timeout=10) as response:
+                data = json.loads(response.read().decode())
                 if isinstance(data, dict) and 'total_subscribers' in data:
                     self.hive_stats = data
                     self.last_hive_stats_fetch = datetime.now()
                     self.hive_stats_error = None
                     return data
                 else:
-                    self.hive_stats_error = f"Invalid API response format"
-            else:
-                self.hive_stats_error = f"HTTP {response.status_code}"
-        except NameError:
-            # requests module not available, use urllib instead
-            try:
-                import urllib.request
-                import json
-                
-                with urllib.request.urlopen("https://stats.hivehub.dev/communities?c=hive-173115", timeout=10) as response:
-                    data = json.loads(response.read().decode())
-                    if isinstance(data, dict) and 'total_subscribers' in data:
-                        self.hive_stats = data
-                        self.last_hive_stats_fetch = datetime.now()
-                        self.hive_stats_error = None
-                        return data
-                    else:
-                        self.hive_stats_error = "Invalid API response"
-            except Exception as e:
-                self.hive_stats_error = f"urllib: {str(e)[:20]}"
-        except requests.exceptions.ConnectionError:
-            self.hive_stats_error = "Connection failed"
-        except requests.exceptions.Timeout:
-            self.hive_stats_error = "Request timeout"
-        except requests.exceptions.RequestException as e:
-            self.hive_stats_error = f"Request error: {str(e)[:30]}"
-        except ValueError as e:
-            self.hive_stats_error = "Invalid JSON response"
+                    self.hive_stats_error = "Invalid API response"
         except Exception as e:
-            self.hive_stats_error = f"Error: {str(e)[:30]}"
+            self.hive_stats_error = f"urllib: {str(e)[:25]}"
         return {}
     
     async def run_speed_test_async(self):

@@ -87,21 +87,16 @@ class ServiceMonitor:
                         upload_speed = 0
                         ping_time = 0
                         
-                        # Debug: log the received data structure
-                        console.print(f"[dim]DEBUG: Speedtest JSON keys: {list(data.keys())}[/dim]")
-                        
                         # Ookla speedtest format
                         if "download" in data and "bandwidth" in data["download"]:
                             download_speed = data["download"]["bandwidth"] * 8 / 1_000_000  # Convert bytes to Mbps
                             upload_speed = data["upload"]["bandwidth"] * 8 / 1_000_000
                             ping_time = data["ping"]["latency"]
-                            console.print(f"[dim]DEBUG: Ookla format - D:{download_speed:.1f} U:{upload_speed:.1f} P:{ping_time:.1f}[/dim]")
                         # speedtest-cli format
                         elif "download" in data and isinstance(data["download"], (int, float)):
                             download_speed = data["download"] / 1_000_000
                             upload_speed = data["upload"] / 1_000_000
                             ping_time = data["ping"]
-                            console.print(f"[dim]DEBUG: CLI format - D:{download_speed:.1f} U:{upload_speed:.1f} P:{ping_time:.1f}[/dim]")
                         # Alternative format
                         elif "Download" in data and "Upload" in data:
                             download_speed = float(str(data["Download"]).split()[0])
@@ -201,13 +196,28 @@ class ServiceMonitor:
             result = subprocess.run(
                 ["docker", "logs", "--tail", str(lines), container_name],
                 capture_output=True,
-                text=True
+                text=True,
+                timeout=10
             )
             if result.returncode == 0:
                 logs = result.stdout.strip().split('\n')
-                return [log for log in logs if log.strip()]
-        except:
-            pass
+                # Also check stderr for logs
+                if result.stderr.strip():
+                    stderr_logs = result.stderr.strip().split('\n')
+                    logs.extend(stderr_logs)
+                
+                valid_logs = [log for log in logs if log.strip()]
+                if valid_logs:
+                    return valid_logs
+                else:
+                    return [f"Container '{container_name}' has no recent logs"]
+            else:
+                return [f"Error getting logs (code {result.returncode}): {result.stderr.strip()}"]
+        except subprocess.TimeoutExpired:
+            return [f"Timeout getting logs for {container_name}"]
+        except Exception as e:
+            return [f"Error: {str(e)}"]
+        
         return ["No logs available"]
     
     def get_docker_stats(self) -> Dict:
@@ -341,22 +351,31 @@ def create_logs_panel(monitor: ServiceMonitor, container: str, title: str) -> Pa
     logs = monitor.get_recent_logs(container, 8)
     
     log_text = Text()
-    for i, log in enumerate(logs[-8:]):  # Show last 8 lines
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        
-        # Color code based on log content
-        if "error" in log.lower() or "fail" in log.lower():
-            style = "red"
-        elif "warning" in log.lower() or "warn" in log.lower():
-            style = "yellow"
-        elif "success" in log.lower() or "complete" in log.lower():
-            style = "green"
-        else:
-            style = "white"
-        
-        # Truncate long lines
-        display_log = log[:80] + "..." if len(log) > 80 else log
-        log_text.append(f"{timestamp} {display_log}\n", style=style)
+    if not logs:
+        log_text.append("No logs available\n", style="dim")
+    else:
+        for i, log in enumerate(logs[-8:]):  # Show last 8 lines
+            # Don't add timestamp if log already contains error messages
+            if log.startswith("Error") or log.startswith("Container") or log.startswith("Timeout"):
+                style = "red"
+                display_log = log[:100] + "..." if len(log) > 100 else log
+                log_text.append(f"{display_log}\n", style=style)
+            else:
+                # Color code based on log content
+                if "error" in log.lower() or "fail" in log.lower():
+                    style = "red"
+                elif "warning" in log.lower() or "warn" in log.lower():
+                    style = "yellow"
+                elif "success" in log.lower() or "complete" in log.lower():
+                    style = "green"
+                elif "info" in log.lower():
+                    style = "cyan"
+                else:
+                    style = "white"
+                
+                # Truncate long lines but preserve more content
+                display_log = log[:100] + "..." if len(log) > 100 else log
+                log_text.append(f"{display_log}\n", style=style)
     
     return Panel(log_text, title=title, border_style="yellow")
 

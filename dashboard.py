@@ -2,553 +2,25 @@
 """
 SkatehiveOps Dashboard
 A terminal dashboard for monitoring video-worker and ytipfs-worker services
+
+Refactored into modular components for better maintainability.
 """
 
 import asyncio
-import json
 import subprocess
-import time
-from datetime import datetime
-from typing import Dict, List, Optional
-
-import requests
 from rich.console import Console
-from rich.layout import Layout
 from rich.live import Live
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.align import Align
+
+# Import our modules
+from monitors.service_monitor import ServiceMonitor
+from panels.internet_panel import create_internet_panel
+from panels.services_panel import create_services_panel
+from panels.hive_stats_panel import create_hive_stats_panel
+from panels.logs_panel import create_logs_panel
+from utils.layout import create_dashboard_layout, create_header_panel, create_footer_panel
 
 console = Console()
 
-class ServiceMonitor:
-    def __init__(self):
-        self.services = {
-            "video-worker": {
-                "url": "http://localhost:8081/healthz",
-                "port": 8081,
-                "container": "video-worker"
-            },
-            "ytipfs-worker": {
-                "url": "http://localhost:6666/health",
-                "port": 6666,
-                "container": "ytipfs-worker"
-            }
-        }
-        self.internet_speed = {"download": 0, "upload": 0, "ping": 0}
-        self.last_speed_test = None
-        self.speedtest_status = "Initializing..."  # Initial status
-        self.speedtest_error = None
-        
-    def check_internet_connection(self) -> Dict:
-        """Check basic internet connectivity"""
-        try:
-            response = requests.get("https://8.8.8.8", timeout=5)
-            return {"status": "🟢 Online", "latency": f"{response.elapsed.total_seconds()*1000:.0f}ms"}
-        except:
-            return {"status": "🔴 Offline", "latency": "N/A"}
-    
-    async def run_speed_test_async(self):
-        """Run internet speed test asynchronously using speedtest"""
-        self.speedtest_status = "Running test..."
-        self.speedtest_error = None
-        
-        # Try different speedtest commands
-        commands_to_try = [
-            ["speedtest", "--format=json"],
-            ["speedtest", "--json"],  # fallback for older versions
-            ["speedtest-cli", "--json"],
-            ["/usr/bin/speedtest", "--format=json"],
-            ["/usr/local/bin/speedtest", "--format=json"]
-        ]
-        
-        for cmd in commands_to_try:
-            try:
-                proc = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                try:
-                    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
-                except asyncio.TimeoutError:
-                    proc.kill()
-                    await proc.wait()
-                    self.speedtest_error = "Test timeout (>2min)"
-                    continue  # Try next command
-                    
-                if proc.returncode == 0:
-                    try:
-                        data = json.loads(stdout.decode())
-                        # Handle different JSON formats from different speedtest tools
-                        download_speed = 0
-                        upload_speed = 0
-                        ping_time = 0
-                        
-                        # Ookla speedtest format
-                        if "download" in data and "bandwidth" in data["download"]:
-                            download_speed = data["download"]["bandwidth"] * 8 / 1_000_000  # Convert bytes to Mbps
-                            upload_speed = data["upload"]["bandwidth"] * 8 / 1_000_000
-                            ping_time = data["ping"]["latency"]
-                        # speedtest-cli format
-                        elif "download" in data and isinstance(data["download"], (int, float)):
-                            download_speed = data["download"] / 1_000_000
-                            upload_speed = data["upload"] / 1_000_000
-                            ping_time = data["ping"]
-                        # Alternative format
-                        elif "Download" in data and "Upload" in data:
-                            download_speed = float(str(data["Download"]).split()[0])
-                            upload_speed = float(str(data["Upload"]).split()[0])
-                            ping_time = float(str(data.get("Ping", "0")).split()[0])
-                        
-                        self.internet_speed = {
-                            "download": download_speed,
-                            "upload": upload_speed,
-                            "ping": ping_time
-                        }
-                        
-                        self.last_speed_test = datetime.now()
-                        self.speedtest_status = "Complete"
-                        return  # Success, exit function
-                    except Exception as e:
-                        self.speedtest_error = f"JSON parse error: {e}"
-                        continue  # Try next command
-                else:
-                    error_msg = stderr.decode().strip()
-                    if "not found" in error_msg or "command not found" in error_msg:
-                        continue  # Try next command
-                    elif "Timeout occurred" in error_msg:
-                        self.speedtest_error = "Connection timeout"
-                        continue  # Try next command
-                    elif "Error:" in error_msg:
-                        # Extract just the error part, not the full output
-                        error_lines = [line for line in error_msg.split('\n') if 'Error:' in line]
-                        if error_lines:
-                            self.speedtest_error = error_lines[0].replace('[error] Error: ', '').strip()
-                        else:
-                            self.speedtest_error = "Network error"
-                        continue  # Try next command
-                    else:
-                        self.speedtest_error = error_msg or "Command failed"
-                        
-            except FileNotFoundError:
-                continue  # Try next command
-            except Exception as e:
-                self.speedtest_error = str(e)
-                continue  # Try next command
-        
-        # If we get here, all commands failed
-        self.speedtest_status = "Failed"
-        if not self.speedtest_error:
-            self.speedtest_error = "Speedtest command not found or not working"
-    
-    def check_service_health(self, service_name: str) -> Dict:
-        """Check individual service health"""
-        service = self.services[service_name]
-        try:
-            response = requests.get(service["url"], timeout=5)
-            if response.status_code == 200:
-                return {
-                    "status": "🟢 Healthy",
-                    "response_time": f"{response.elapsed.total_seconds()*1000:.0f}ms",
-                    "uptime": self.get_container_uptime(service["container"])
-                }
-        except requests.exceptions.RequestException:
-            pass
-        
-        return {
-            "status": "🔴 Down", 
-            "response_time": "N/A",
-            "uptime": "N/A"
-        }
-    
-    def get_container_uptime(self, container_name: str) -> str:
-        """Get Docker container uptime"""
-        commands_to_try = [
-            ["docker", "inspect", container_name, "--format", "{{.State.StartedAt}}"],
-            ["sudo", "docker", "inspect", container_name, "--format", "{{.State.StartedAt}}"]
-        ]
-        
-        for cmd in commands_to_try:
-            try:
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-                if result.returncode == 0:
-                    start_time = datetime.fromisoformat(result.stdout.strip().replace('Z', '+00:00'))
-                    uptime = datetime.now().astimezone() - start_time.astimezone()
-                    
-                    days = uptime.days
-                    hours, remainder = divmod(uptime.seconds, 3600)
-                    minutes, _ = divmod(remainder, 60)
-                    
-                    if days > 0:
-                        return f"{days}d {hours}h {minutes}m"
-                    elif hours > 0:
-                        return f"{hours}h {minutes}m"
-                    else:
-                        return f"{minutes}m"
-                elif "permission denied" in result.stderr.lower() and cmd[0] != "sudo":
-                    continue  # Try with sudo
-            except Exception:
-                continue  # Try next command
-        return "Unknown"
-    
-    def get_recent_logs(self, container_name: str, lines: int = 5) -> List[str]:
-        """Get recent container logs"""
-        # Try without sudo first, then with sudo if permission denied
-        commands_to_try = [
-            ["docker", "logs", "--tail", str(lines), container_name],
-            ["sudo", "docker", "logs", "--tail", str(lines), container_name]
-        ]
-        
-        for cmd in commands_to_try:
-            try:
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-                if result.returncode == 0:
-                    logs = result.stdout.strip().split('\n')
-                    # Also check stderr for logs
-                    if result.stderr.strip():
-                        stderr_logs = result.stderr.strip().split('\n')
-                        logs.extend(stderr_logs)
-                    
-                    valid_logs = [log for log in logs if log.strip()]
-                    if valid_logs:
-                        return valid_logs
-                    else:
-                        return [f"Container '{container_name}' has no recent logs"]
-                elif "permission denied" in result.stderr.lower() and cmd[0] != "sudo":
-                    continue  # Try with sudo
-                else:
-                    return [f"Error getting logs (code {result.returncode}): {result.stderr.strip()}"]
-            except subprocess.TimeoutExpired:
-                return [f"Timeout getting logs for {container_name}"]
-            except Exception as e:
-                if "permission denied" in str(e).lower() and cmd[0] != "sudo":
-                    continue  # Try with sudo
-                return [f"Error: {str(e)}"]
-        
-        return ["No logs available"]
-    
-    def get_docker_stats(self) -> Dict:
-        """Get Docker container resource usage"""
-        commands_to_try = [
-            ["docker", "stats", "--no-stream", "--format", 
-             "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"],
-            ["sudo", "docker", "stats", "--no-stream", "--format", 
-             "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"]
-        ]
-        
-        for cmd in commands_to_try:
-            try:
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=15
-                )
-                if result.returncode == 0:
-                    lines = result.stdout.strip().split('\n')[1:]  # Skip header
-                    stats = {}
-                    for line in lines:
-                        parts = line.split('\t')
-                        if len(parts) >= 4:
-                            container = parts[0]
-                            if container in ["video-worker", "ytipfs-worker"]:
-                                stats[container] = {
-                                    "cpu": parts[1],
-                                    "memory": parts[2].split(' / ')[0],
-                                    "network": parts[3]
-                                }
-                    return stats
-                elif "permission denied" in result.stderr.lower() and cmd[0] != "sudo":
-                    continue  # Try with sudo
-            except subprocess.TimeoutExpired:
-                continue  # Try next command
-            except Exception:
-                continue  # Try next command
-        return {}
-
-def create_dashboard_layout() -> Layout:
-    """Create the dashboard layout"""
-    layout = Layout()
-    
-    layout.split_column(
-        Layout(name="header", size=3),
-        Layout(name="main"),
-        Layout(name="footer", size=3)
-    )
-    
-    layout["main"].split_row(
-        Layout(name="left"),
-        Layout(name="right")
-    )
-    
-    layout["left"].split_column(
-        Layout(name="internet", size=11),
-        Layout(name="services", size=12)
-    )
-    
-    layout["right"].split_column(
-        Layout(name="video_worker_logs", size=10),
-        Layout(name="ytipfs_logs", size=10)
-    )
-    
-    return layout
-
-def create_header_panel() -> Panel:
-    """Create header panel"""
-    title = Text("🛠️  SkatehiveOps Dashboard", style="bold magenta")
-    subtitle = Text(f"Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", style="dim")
-    
-    header_text = Align.center(title + "\n" + subtitle)
-    return Panel(header_text, style="bright_blue")
-
-def create_internet_panel(monitor: ServiceMonitor) -> Panel:
-    """Create internet status panel"""
-    table = Table(show_header=True, header_style="bold cyan")
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", style="green")
-    
-    # Basic connectivity
-    conn_status = monitor.check_internet_connection()
-    table.add_row("Connection", conn_status["status"])
-    table.add_row("Latency", conn_status["latency"])
-    
-    # Speed test status and results
-    status = monitor.speedtest_status
-    if status == "Complete" and monitor.last_speed_test:
-        # Always show all three metrics
-        download = monitor.internet_speed.get('download', 0)
-        upload = monitor.internet_speed.get('upload', 0)
-        ping = monitor.internet_speed.get('ping', 0)
-        
-        table.add_row("Download", f"{download:.1f} Mbps")
-        table.add_row("Upload", f"{upload:.1f} Mbps")
-        table.add_row("Ping", f"{ping:.1f} ms")
-        age = datetime.now() - monitor.last_speed_test
-        table.add_row("Last Test", f"{int(age.total_seconds()//60)} min ago")
-    elif status == "Running test...":
-        table.add_row("Speed Test", "🔄 Running test...")
-    elif status == "Failed":
-        table.add_row("Speed Test", f"[red]Failed[/red]")
-        if monitor.speedtest_error:
-            # Truncate long error messages
-            error_msg = monitor.speedtest_error[:50] + "..." if len(monitor.speedtest_error) > 50 else monitor.speedtest_error
-            table.add_row("Error", f"[red]{error_msg}[/red]")
-    else:
-        table.add_row("Speed Test", "🔄 Initializing...")
-    
-    return Panel(table, title="🌐 Internet Status", border_style="blue")
-
-def create_services_panel(monitor: ServiceMonitor) -> Panel:
-    """Create services status panel"""
-    table = Table(show_header=True, header_style="bold cyan")
-    table.add_column("Service", style="cyan")
-    table.add_column("Status", style="green")
-    table.add_column("Response", style="yellow")
-    table.add_column("Uptime", style="magenta")
-    table.add_column("CPU", style="red")
-    table.add_column("Memory", style="blue")
-    
-    docker_stats = monitor.get_docker_stats()
-    
-    for service_name in monitor.services:
-        health = monitor.check_service_health(service_name)
-        stats = docker_stats.get(service_name, {"cpu": "N/A", "memory": "N/A"})
-        
-        table.add_row(
-            service_name,
-            health["status"],
-            health["response_time"],
-            health["uptime"],
-            stats["cpu"],
-            stats["memory"]
-        )
-    
-    return Panel(table, title="🚀 Services Status", border_style="green")
-
-def create_logs_panel(monitor: ServiceMonitor, container: str, title: str) -> Panel:
-    """Create logs panel for a service"""
-    logs = monitor.get_recent_logs(container, 30)  # Get more lines for better context
-
-    # Parse logs for prettified info
-    downloads = []  # (content, user, timestamp)
-    last_error = None
-    last_error_user = None
-
-    for log in reversed(logs):
-        # Look for various download patterns 
-        # Pattern 1: POST /download requests (actual download initiation)
-        if "POST /download" in log:
-            import re
-            # Extract IP, timestamp from HTTP log
-            match = re.search(r'([0-9:.]+) - - \[([^\]]+)\] "POST ([^"]+)"', log)
-            if match:
-                ip = match.group(1)
-                timestamp = match.group(2)
-                endpoint = match.group(3)
-                downloads.append(("Download Request", ip.split(':')[-1], timestamp))
-        
-        # Pattern 2: Download progress indicators from yt-dlp/youtube-dl
-        elif "[download]" in log and "%" in log:
-            import re
-            # Look for download progress like "[download] 63.0% of 6.27M"
-            progress_match = re.search(r'\[download\]\s+([0-9.]+)%\s+of\s+([0-9.]+[KMGT]?[iB]*)', log)
-            if progress_match:
-                percentage = progress_match.group(1)
-                size = progress_match.group(2)
-                # Only count completed downloads (100%)
-                if float(percentage) == 100.0:
-                    downloads.append((f"{size} file", "system", "completed"))
-        
-        # Pattern 3: INFO messages about downloading specific content
-        elif "INFO Downloading:" in log:
-            import re
-            # Extract the URL being downloaded
-            url_match = re.search(r'INFO Downloading: (.+)', log)
-            if url_match:
-                url = url_match.group(1)
-                # Extract video ID or meaningful part
-                if "youtube.com" in url or "youtu.be" in url:
-                    video_id = url.split('/')[-1].split('?')[0][-11:]  # Last 11 chars for YT video ID
-                    downloads.append((f"YT:{video_id}", "system", "downloading"))
-                else:
-                    domain = url.split('/')[2] if len(url.split('/')) > 2 else "external"
-                    downloads.append((domain, "system", "downloading"))
-        
-        # Pattern 4: INFO messages about converted file paths
-        elif "INFO Converted file path:" in log:
-            import re
-            path_match = re.search(r'INFO Converted file path: (.+)', log)
-            if path_match:
-                filepath = path_match.group(1)
-                filename = filepath.split('/')[-1][:20]  # Get filename, truncate if long
-                downloads.append((filename, "system", "converted"))
-                
-        if len(downloads) >= 5:
-            break
-
-    # Find last error and user
-    for log in reversed(logs):
-        # Look for HTTP errors (4xx, 5xx status codes) or explicit error messages
-        if any(pattern in log.lower() for pattern in ["error", " 4", " 5"]) and not "GET /health" in log:
-            # Check for HTTP error status codes
-            import re
-            http_error_match = re.search(r'"[^"]*" ([45]\d\d) ', log)
-            if http_error_match:
-                status_code = http_error_match.group(1)
-                last_error = f"HTTP {status_code} error in: {log.strip()}"
-                # Extract IP as user
-                ip_match = re.search(r'([0-9:.]+) - -', log)
-                if ip_match:
-                    last_error_user = ip_match.group(1).split(':')[-1]
-                break
-            elif "error" in log.lower():
-                last_error = log.strip()
-                # Try to extract user from error log
-                match = re.search(r"user: ([^ ]+)", log, re.IGNORECASE)
-                if match:
-                    last_error_user = match.group(1)
-                else:
-                    # Try to extract IP
-                    ip_match = re.search(r'([0-9:.]+) - -', log)
-                    if ip_match:
-                        last_error_user = ip_match.group(1).split(':')[-1]
-                break
-
-    # Build human readable output
-    log_text = Text()
-    if downloads:
-        log_text.append("Latest Downloads:\n", style="bold green")
-        for idx, (content, user, timestamp) in enumerate(downloads, 1):
-            # Handle different types of activity
-            if user == "system":
-                if timestamp == "completed":
-                    log_text.append(f"  {idx}. ", style="white")
-                    log_text.append(f"{content}", style="cyan")
-                    log_text.append(" ✓ completed", style="green")
-                    log_text.append("\n")
-                elif timestamp == "downloading":
-                    log_text.append(f"  {idx}. ", style="white")
-                    log_text.append(f"{content}", style="cyan")
-                    log_text.append(" ⏬ downloading", style="yellow")
-                    log_text.append("\n")
-                elif timestamp == "converted":
-                    log_text.append(f"  {idx}. ", style="white")
-                    log_text.append(f"{content}", style="cyan")
-                    log_text.append(" 🔄 converted", style="blue")
-                    log_text.append("\n")
-                else:
-                    log_text.append(f"  {idx}. ", style="white")
-                    log_text.append(f"{content}", style="cyan")
-                    log_text.append(f" {timestamp}", style="white")
-                    log_text.append("\n")
-            else:
-                # User-initiated downloads
-                display_user = user.split('.')[-1] if '.' in user else user[:10]
-                
-                if timestamp != "recent":
-                    try:
-                        if '/' in timestamp and ':' in timestamp:
-                            time_part = timestamp.split()[0]
-                            display_time = time_part.split(':')[1:3]
-                            time_str = ":".join(display_time)
-                        else:
-                            time_str = timestamp[-8:] if len(timestamp) > 8 else timestamp
-                    except:
-                        time_str = "recent"
-                else:
-                    time_str = "recent"
-                
-                log_text.append(f"  {idx}. ", style="white")
-                log_text.append(f"{content}", style="cyan")
-                log_text.append(" by ", style="white")
-                log_text.append(f"{display_user}", style="magenta")
-                log_text.append(" at ", style="white")
-                log_text.append(f"{time_str}", style="yellow")
-                log_text.append("\n")
-    else:
-        log_text.append("No recent downloads found.\n", style="dim")
-        log_text.append("Looking for: POST /download, [download] progress, INFO messages\n", style="dim")
-
-    if last_error:
-        log_text.append("\nLast Error:\n", style="bold red")
-        log_text.append(f"  {last_error}\n", style="red")
-        if last_error_user:
-            log_text.append(f"  User affected: [magenta]{last_error_user}[/magenta]\n")
-    else:
-        log_text.append("\nNo errors found in recent logs.\n", style="dim")
-
-    # Show filtered recent log lines (excluding health checks)
-    log_text.append("\nRecent Activity:\n", style="bold yellow")
-    filtered_logs = [log for log in logs[-10:] if not any(hc in log for hc in ["GET /health", "GET /healthz"])]
-    
-    if filtered_logs:
-        for log in filtered_logs[-3:]:  # Show last 3 non-health-check logs
-            # Truncate very long log lines
-            display_log = log[:80] + "..." if len(log) > 80 else log
-            log_text.append(f"  {display_log}\n", style="white")
-    else:
-        log_text.append("  Only health check requests in recent logs\n", style="dim")
-
-    return Panel(log_text, title=title, border_style="yellow")
-
-def create_footer_panel() -> Panel:
-    """Create footer panel"""
-    footer_text = Text("Press Ctrl+C to exit | Auto-refresh every 10s | Speed test every 5min", 
-                      style="dim", justify="center")
-    return Panel(footer_text, style="bright_black")
 
 async def run_periodic_speed_test(monitor: ServiceMonitor):
     """Run speed test every 5 minutes asynchronously"""
@@ -556,20 +28,25 @@ async def run_periodic_speed_test(monitor: ServiceMonitor):
         await monitor.run_speed_test_async()
         await asyncio.sleep(300)  # 5 minutes
 
+
 async def main():
     """Main dashboard loop"""
     monitor = ServiceMonitor()
     layout = create_dashboard_layout()
+    
     # Start initial speed test in background
     initial_speedtest_task = asyncio.create_task(monitor.run_speed_test_async())
     # Start periodic speed test
     speed_test_task = asyncio.create_task(run_periodic_speed_test(monitor))
+    
     try:
         with Live(layout, refresh_per_second=1, screen=True):
             while True:
+                # Update all panels
                 layout["header"].update(create_header_panel())
                 layout["internet"].update(create_internet_panel(monitor))
                 layout["services"].update(create_services_panel(monitor))
+                layout["hive_stats"].update(create_hive_stats_panel(monitor))
                 layout["video_worker_logs"].update(
                     create_logs_panel(monitor, "video-worker", "📹 Video Worker Logs")
                 )
@@ -577,14 +54,17 @@ async def main():
                     create_logs_panel(monitor, "ytipfs-worker", "📦 YTIPFS Worker Logs")
                 )
                 layout["footer"].update(create_footer_panel())
-                await asyncio.sleep(10)
+                
+                await asyncio.sleep(10)  # Refresh every 10 seconds
+                
     except KeyboardInterrupt:
         speed_test_task.cancel()
         initial_speedtest_task.cancel()
         console.print("\n[yellow]Dashboard stopped.[/yellow]")
 
+
 if __name__ == "__main__":
-    # Check for speedtest availability (but don't exit if not found, let runtime handle it)
+    # Check for dependencies
     speedtest_available = False
     for cmd in ["speedtest", "speedtest-cli"]:
         try:
@@ -609,6 +89,6 @@ if __name__ == "__main__":
     except ImportError:
         console.print("[yellow]Installing rich library...[/yellow]")
         subprocess.run(["pip3", "install", "rich"], check=True)
-        import rich
     
+    # Run the dashboard
     asyncio.run(main())

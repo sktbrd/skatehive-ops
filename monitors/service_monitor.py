@@ -340,26 +340,35 @@ class ServiceMonitor:
     def _get_container_memory_usage(self, container_name: str) -> str:
         """Get actual memory usage from container when Docker stats shows 0B"""
         try:
-            # Try to get memory usage from /sys/fs/cgroup inside container
-            cmd = ["docker", "exec", container_name, "sh", "-c", 
-                   "if [ -f /sys/fs/cgroup/memory/memory.usage_in_bytes ]; then cat /sys/fs/cgroup/memory/memory.usage_in_bytes; else cat /sys/fs/cgroup/memory.current 2>/dev/null || echo '0'; fi"]
-            
+            # Get the main process ID of the container
+            cmd = ["docker", "inspect", container_name, "--format", "{{.State.Pid}}"]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            
             if result.returncode == 0 and result.stdout.strip().isdigit():
-                memory_bytes = int(result.stdout.strip())
-                return self._format_bytes(memory_bytes)
-        except:
-            pass
-        
-        try:
-            # Alternative: try to get process memory from inside container
-            cmd = ["docker", "exec", container_name, "sh", "-c", 
-                   "ps aux | awk 'NR>1 {sum+=$6} END {print sum*1024}'"]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            if result.returncode == 0 and result.stdout.strip().replace('.', '').isdigit():
-                memory_bytes = float(result.stdout.strip())
-                return self._format_bytes(int(memory_bytes))
+                pid = result.stdout.strip()
+                
+                # Get memory usage from /proc/PID/status
+                try:
+                    with open(f"/proc/{pid}/status", "r") as f:
+                        for line in f:
+                            if line.startswith("VmRSS:"):  # Resident Set Size (actual memory usage)
+                                mem_kb = int(line.split()[1])
+                                return self._format_bytes(mem_kb * 1024)  # Convert KB to bytes
+                except:
+                    pass
+                
+                # Alternative: use /proc/PID/statm
+                try:
+                    with open(f"/proc/{pid}/statm", "r") as f:
+                        # statm format: size resident shared text lib data dt
+                        statm = f.read().split()
+                        if len(statm) >= 2:
+                            resident_pages = int(statm[1])
+                            page_size = 4096  # Standard page size
+                            memory_bytes = resident_pages * page_size
+                            return self._format_bytes(memory_bytes)
+                except:
+                    pass
         except:
             pass
             

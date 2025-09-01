@@ -12,24 +12,24 @@ from rich.align import Align
 
 
 def create_dashboard_layout() -> Layout:
-    """Create the dashboard layout with better proportions"""
+    """Create the dashboard layout with proper proportions"""
     layout = Layout()
     
     layout.split_column(
-        Layout(name="header", size=4),
+        Layout(name="header", size=3),
         Layout(name="main"),
         Layout(name="footer", size=2)
     )
     
     layout["main"].split_row(
-        Layout(name="left", ratio=2),
-        Layout(name="right", ratio=3)
+        Layout(name="left", ratio=3),
+        Layout(name="right", ratio=2)
     )
     
     layout["left"].split_column(
-        Layout(name="internet", size=7),
-        Layout(name="services", size=7),
-        Layout(name="hive_stats", size=8)
+        Layout(name="internet", size=9),
+        Layout(name="services", size=8),
+        Layout(name="hive_stats", size=12)
     )
     
     layout["right"].split_column(
@@ -42,14 +42,9 @@ def create_dashboard_layout() -> Layout:
 
 def create_header_panel() -> Panel:
     """Create header panel with clean branding"""
-    content = """
-🛠️ SKATEHIVE OPS DASHBOARD 🛠️
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Updated: {time} | Monitoring: Video Worker • YTIPFS Worker • Hive Community
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-""".format(time=datetime.now().strftime('%H:%M:%S'))
+    content = f"🛠️ SKATEHIVE OPS DASHBOARD 🛠️ | Updated: {datetime.now().strftime('%H:%M:%S')} | Monitoring: Video Worker • YTIPFS Worker • Hive Community"
     
-    return Panel(content.strip(), style="bold bright_blue", border_style="cyan")
+    return Panel(content, style="bold bright_blue", border_style="cyan")
 
 
 def create_footer_panel() -> Panel:

@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 """
-L    layout["left"].split_column(
-        Layout(name="internet", size=9),
-        Layout(name="services", size=10),
-        Layout(name="hive_stats", size=15)
-    ) Utilities
+Layout Utilities
 Functions for creating dashboard layouts and panels
 """
 
@@ -42,38 +38,6 @@ def create_dashboard_layout() -> Layout:
     )
     
     return layout
-
-
-def create_ascii_art_panel() -> Panel:
-    """Create ASCII art panel with skatehive logo"""
-    def create_footer_panel() -> Panel:
-    """Create footer panel"""
-    footer_text = Text("Press Ctrl+C to exit | Auto-refresh every 10s | Speed test every 15min", 
-                      style="dim", justify="center")
-    return Panel(footer_text, style="bright_black")
-    return Panel(Text(ascii_art, style="bright_blue"), border_style="cyan")
-
-
-def create_header_info_panel() -> Panel:
-    """Create header info panel"""
-    lines = [
-        "🛠️ SkatehiveOps Dashboard",
-        "",
-        f"Updated: {datetime.now().strftime('%H:%M:%S')}",
-        "",
-        "Monitoring Services:",
-        "• Video Worker Status",
-        "• YTIPFS Worker Status", 
-        "• Internet Connection",
-        "• Hive Community Stats",
-        "",
-        "─" * 25,
-        "",
-        "Press Ctrl+C to exit"
-    ]
-    
-    content = "\n".join(lines)
-    return Panel(content, style="bright_blue", title="[bold magenta]Info[/bold magenta]")
 
 
 def create_header_panel() -> Panel:

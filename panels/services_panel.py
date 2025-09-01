@@ -10,13 +10,13 @@ from rich.table import Table
 
 def create_services_panel(monitor) -> Panel:
     """Create services status panel"""
-    table = Table(show_header=True, header_style="bold cyan")
-    table.add_column("Service", style="cyan")
-    table.add_column("Status", style="green")
-    table.add_column("Response", style="yellow")
-    table.add_column("Uptime", style="magenta")
-    table.add_column("CPU", style="red")
-    table.add_column("Memory", style="blue")
+    table = Table(show_header=True, header_style="bold cyan", padding=(0, 1))
+    table.add_column("Service", style="cyan", width=14)
+    table.add_column("Status", style="green", width=8)
+    table.add_column("Response", style="yellow", width=8)
+    table.add_column("Uptime", style="magenta", width=10)
+    table.add_column("CPU", style="red", width=6)
+    table.add_column("Memory", style="blue", width=8)
     
     docker_stats = monitor.get_docker_stats()
     

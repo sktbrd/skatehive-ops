@@ -11,9 +11,9 @@ from rich.table import Table
 
 def create_hive_stats_panel(monitor) -> Panel:
     """Create Hive community stats panel"""
-    table = Table(show_header=True, header_style="bold cyan")
-    table.add_column("Metric", style="cyan", width=22)
-    table.add_column("Value", style="green", width=12)
+    table = Table(show_header=True, header_style="bold cyan", padding=(0, 1))
+    table.add_column("Metric", style="cyan", width=18)
+    table.add_column("Value", style="green", width=14)
     
     # Fetch fresh stats every 5 minutes or if no data
     if (not monitor.last_hive_stats_fetch or 
@@ -50,7 +50,7 @@ def create_hive_stats_panel(monitor) -> Panel:
             table.add_row("💡 Fix", "Install requests:")
             table.add_row("", "pip3 install requests")
         else:
-            error_short = str(monitor.hive_stats_error)[:25] + "..." if len(str(monitor.hive_stats_error)) > 25 else str(monitor.hive_stats_error)
+            error_short = str(monitor.hive_stats_error)[:20] + "..." if len(str(monitor.hive_stats_error)) > 20 else str(monitor.hive_stats_error)
             table.add_row("Details", error_short)
     else:
         table.add_row("⏳ Status", "Loading...")

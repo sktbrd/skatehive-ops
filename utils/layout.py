@@ -20,9 +20,9 @@ def create_dashboard_layout() -> Layout:
     layout = Layout()
     
     layout.split_column(
-        Layout(name="header", size=3),
+        Layout(name="header", size=2),
         Layout(name="main"),
-        Layout(name="footer", size=3)
+        Layout(name="footer", size=2)
     )
     
     layout["main"].split_row(
@@ -31,14 +31,14 @@ def create_dashboard_layout() -> Layout:
     )
     
     layout["left"].split_column(
-        Layout(name="internet", size=9),
-        Layout(name="services", size=8),
-        Layout(name="hive_stats", size=10)
+        Layout(name="internet", size=12),
+        Layout(name="services", size=12),
+        Layout(name="hive_stats", size=16)
     )
     
     layout["right"].split_column(
-        Layout(name="video_worker_logs", size=10),
-        Layout(name="ytipfs_logs", size=10)
+        Layout(name="video_worker_logs"),
+        Layout(name="ytipfs_logs")
     )
     
     return layout

@@ -11,9 +11,9 @@ from rich.table import Table
 
 def create_internet_panel(monitor) -> Panel:
     """Create internet status panel"""
-    table = Table(show_header=True, header_style="bold cyan", padding=(0, 1))
-    table.add_column("Metric", style="cyan", width=12)
-    table.add_column("Value", style="green", width=15)
+    table = Table(show_header=True, header_style="bold cyan", padding=(0, 0), box=None)
+    table.add_column("Metric", style="cyan", width=10)
+    table.add_column("Value", style="green", width=12)
     
     # Basic connectivity
     conn_status = monitor.check_internet_connection()
@@ -34,14 +34,14 @@ def create_internet_panel(monitor) -> Panel:
         age = datetime.now() - monitor.last_speed_test
         table.add_row("Last Test", f"{int(age.total_seconds()//60)}m ago")
     elif status == "Running test...":
-        table.add_row("Speed Test", "🔄 Running test...")
+        table.add_row("Speed Test", "🔄 Running...")
     elif status == "Failed":
         table.add_row("Speed Test", f"[red]Failed[/red]")
         if monitor.speedtest_error:
             # Truncate long error messages
-            error_msg = monitor.speedtest_error[:40] + "..." if len(monitor.speedtest_error) > 40 else monitor.speedtest_error
+            error_msg = monitor.speedtest_error[:30] + "..." if len(monitor.speedtest_error) > 30 else monitor.speedtest_error
             table.add_row("Error", f"[red]{error_msg}[/red]")
     else:
-        table.add_row("Speed Test", "🔄 Initializing...")
+        table.add_row("Speed Test", "🔄 Init...")
     
     return Panel(table, title="🌐 Internet Status", border_style="blue")

@@ -27,9 +27,9 @@ def create_dashboard_layout() -> Layout:
     )
     
     layout["left"].split_column(
-        Layout(name="internet", size=11),
-        Layout(name="services", size=12),
-        Layout(name="hive_stats", size=12)
+        Layout(name="internet", size=9),
+        Layout(name="services", size=8),
+        Layout(name="hive_stats", size=10)
     )
     
     layout["right"].split_column(

@@ -50,14 +50,26 @@ class ServiceMonitor:
             response = requests.get("https://stats.hivehub.dev/communities?c=hive-173115", timeout=10)
             if response.status_code == 200:
                 data = response.json()
-                self.hive_stats = data
-                self.last_hive_stats_fetch = datetime.now()
-                self.hive_stats_error = None
-                return data
+                # Validate that we got expected data structure
+                if isinstance(data, dict) and 'total_subscribers' in data:
+                    self.hive_stats = data
+                    self.last_hive_stats_fetch = datetime.now()
+                    self.hive_stats_error = None
+                    return data
+                else:
+                    self.hive_stats_error = f"Invalid API response format"
+            else:
+                self.hive_stats_error = f"HTTP {response.status_code}"
+        except requests.exceptions.ConnectionError:
+            self.hive_stats_error = "Connection failed"
+        except requests.exceptions.Timeout:
+            self.hive_stats_error = "Request timeout"
         except requests.exceptions.RequestException as e:
-            self.hive_stats_error = f"API Error: {str(e)}"
+            self.hive_stats_error = f"Request error: {str(e)[:30]}"
+        except ValueError as e:
+            self.hive_stats_error = "Invalid JSON response"
         except Exception as e:
-            self.hive_stats_error = f"Error: {str(e)}"
+            self.hive_stats_error = f"Error: {str(e)[:30]}"
         return {}
     
     async def run_speed_test_async(self):

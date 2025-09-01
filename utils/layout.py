@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Layout Utilities
+L    layout["left"].split_column(
+        Layout(name="internet", size=9),
+        Layout(name="services", size=10),
+        Layout(name="hive_stats", size=15)
+    ) Utilities
 Functions for creating dashboard layouts and panels
 """
 

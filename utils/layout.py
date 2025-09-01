@@ -20,14 +20,9 @@ def create_dashboard_layout() -> Layout:
     layout = Layout()
     
     layout.split_column(
-        Layout(name="header", size=25),
+        Layout(name="header", size=3),
         Layout(name="main"),
         Layout(name="footer", size=2)
-    )
-    
-    layout["header"].split_row(
-        Layout(name="ascii_art"),
-        Layout(name="header_info", ratio=1)
     )
     
     layout["main"].split_row(
@@ -51,28 +46,11 @@ def create_dashboard_layout() -> Layout:
 
 def create_ascii_art_panel() -> Panel:
     """Create ASCII art panel with skatehive logo"""
-    ascii_art = """
-  ╔═══════════════════════════════════════════════════════════╗
-  ║                                                           ║
-  ║     ********    **.     .**      ******    ************   ║
-  ║     ********    **.     .**      ******    ************   ║
-  ║   **            **.   =*+      **      **        **      ║
-  ║     ******      ******-        **********        **      ║
-  ║           **    **.   =*+      **      **        **      ║
-  ║   ********      **.     :**    **      **        **      ║
-  ║   ********      **.     :**    **      **        **      ║
-  ║                                                           ║
-  ║   ****        **    +**********    ****          ****    ║
-  ║   ****        **    +**********    ****          ****    ║
-  ║   ****        **        .****      ****          ****    ║
-  ║   ****        **        .****      ****          ****    ║
-  ║   **************        .****          ****  ****        ║
-  ║   **************        .****          ****  ****        ║
-  ║   ****        **    +**********            **            ║
-  ║   ****        **    +**********            **            ║
-  ║                                                           ║
-  ╚═══════════════════════════════════════════════════════════╝
-"""
+    def create_footer_panel() -> Panel:
+    """Create footer panel"""
+    footer_text = Text("Press Ctrl+C to exit | Auto-refresh every 10s | Speed test every 15min", 
+                      style="dim", justify="center")
+    return Panel(footer_text, style="bright_black")
     return Panel(Text(ascii_art, style="bright_blue"), border_style="cyan")
 
 
@@ -99,8 +77,17 @@ def create_header_info_panel() -> Panel:
 
 
 def create_header_panel() -> Panel:
-    """Create header panel - kept for backward compatibility"""
-    return create_header_info_panel()
+    """Create header panel with ASCII art"""
+    ascii_art = """
+🛠️ SKATEHIVE OPS DASHBOARD 🛠️    ╔══════════════════════════════╗
+                               ║  ╔══╗ ║  ╔══╗ ╔══════╗ ╔══════╗ ║
+Updated: {time}                ║  ║  ║ ║  ║  ║    ║    ║      ║ ║
+                               ║  ╚══╝ ╠══╣  ║    ║    ╠══════╣ ║
+Monitoring Services            ║       ║  ║  ║    ║    ║      ║ ║
+                               ╚═══════════════════════════════╝
+""".format(time=datetime.now().strftime('%H:%M:%S'))
+    
+    return Panel(ascii_art, style="bright_blue", border_style="cyan")
 
 
 def create_footer_panel() -> Panel:

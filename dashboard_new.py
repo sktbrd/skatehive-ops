@@ -17,7 +17,7 @@ from panels.internet_panel import create_internet_panel
 from panels.services_panel import create_services_panel
 from panels.hive_stats_panel import create_hive_stats_panel
 from panels.logs_panel import create_logs_panel
-from utils.layout import create_dashboard_layout, create_header_panel, create_footer_panel, create_ascii_art_panel, create_header_info_panel
+from utils.layout import create_dashboard_layout, create_header_panel, create_footer_panel
 
 console = Console()
 
@@ -43,8 +43,7 @@ async def main():
         with Live(layout, refresh_per_second=1, screen=True):
             while True:
                 # Update all panels
-                layout["ascii_art"].update(create_ascii_art_panel())
-                layout["header_info"].update(create_header_info_panel())
+                layout["header"].update(create_header_panel())
                 layout["internet"].update(create_internet_panel(monitor))
                 layout["services"].update(create_services_panel(monitor))
                 layout["hive_stats"].update(create_hive_stats_panel(monitor))

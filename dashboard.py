@@ -166,85 +166,117 @@ class ServiceMonitor:
     
     def get_container_uptime(self, container_name: str) -> str:
         """Get Docker container uptime"""
-        try:
-            result = subprocess.run(
-                ["docker", "inspect", container_name, "--format", "{{.State.StartedAt}}"],
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0:
-                start_time = datetime.fromisoformat(result.stdout.strip().replace('Z', '+00:00'))
-                uptime = datetime.now().astimezone() - start_time.astimezone()
-                
-                days = uptime.days
-                hours, remainder = divmod(uptime.seconds, 3600)
-                minutes, _ = divmod(remainder, 60)
-                
-                if days > 0:
-                    return f"{days}d {hours}h {minutes}m"
-                elif hours > 0:
-                    return f"{hours}h {minutes}m"
-                else:
-                    return f"{minutes}m"
-        except:
-            pass
+        commands_to_try = [
+            ["docker", "inspect", container_name, "--format", "{{.State.StartedAt}}"],
+            ["sudo", "docker", "inspect", container_name, "--format", "{{.State.StartedAt}}"]
+        ]
+        
+        for cmd in commands_to_try:
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode == 0:
+                    start_time = datetime.fromisoformat(result.stdout.strip().replace('Z', '+00:00'))
+                    uptime = datetime.now().astimezone() - start_time.astimezone()
+                    
+                    days = uptime.days
+                    hours, remainder = divmod(uptime.seconds, 3600)
+                    minutes, _ = divmod(remainder, 60)
+                    
+                    if days > 0:
+                        return f"{days}d {hours}h {minutes}m"
+                    elif hours > 0:
+                        return f"{hours}h {minutes}m"
+                    else:
+                        return f"{minutes}m"
+                elif "permission denied" in result.stderr.lower() and cmd[0] != "sudo":
+                    continue  # Try with sudo
+            except Exception:
+                continue  # Try next command
         return "Unknown"
     
     def get_recent_logs(self, container_name: str, lines: int = 5) -> List[str]:
         """Get recent container logs"""
-        try:
-            result = subprocess.run(
-                ["docker", "logs", "--tail", str(lines), container_name],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            if result.returncode == 0:
-                logs = result.stdout.strip().split('\n')
-                # Also check stderr for logs
-                if result.stderr.strip():
-                    stderr_logs = result.stderr.strip().split('\n')
-                    logs.extend(stderr_logs)
-                
-                valid_logs = [log for log in logs if log.strip()]
-                if valid_logs:
-                    return valid_logs
+        # Try without sudo first, then with sudo if permission denied
+        commands_to_try = [
+            ["docker", "logs", "--tail", str(lines), container_name],
+            ["sudo", "docker", "logs", "--tail", str(lines), container_name]
+        ]
+        
+        for cmd in commands_to_try:
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode == 0:
+                    logs = result.stdout.strip().split('\n')
+                    # Also check stderr for logs
+                    if result.stderr.strip():
+                        stderr_logs = result.stderr.strip().split('\n')
+                        logs.extend(stderr_logs)
+                    
+                    valid_logs = [log for log in logs if log.strip()]
+                    if valid_logs:
+                        return valid_logs
+                    else:
+                        return [f"Container '{container_name}' has no recent logs"]
+                elif "permission denied" in result.stderr.lower() and cmd[0] != "sudo":
+                    continue  # Try with sudo
                 else:
-                    return [f"Container '{container_name}' has no recent logs"]
-            else:
-                return [f"Error getting logs (code {result.returncode}): {result.stderr.strip()}"]
-        except subprocess.TimeoutExpired:
-            return [f"Timeout getting logs for {container_name}"]
-        except Exception as e:
-            return [f"Error: {str(e)}"]
+                    return [f"Error getting logs (code {result.returncode}): {result.stderr.strip()}"]
+            except subprocess.TimeoutExpired:
+                return [f"Timeout getting logs for {container_name}"]
+            except Exception as e:
+                if "permission denied" in str(e).lower() and cmd[0] != "sudo":
+                    continue  # Try with sudo
+                return [f"Error: {str(e)}"]
         
         return ["No logs available"]
     
     def get_docker_stats(self) -> Dict:
         """Get Docker container resource usage"""
-        try:
-            result = subprocess.run(
-                ["docker", "stats", "--no-stream", "--format", 
-                 "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"],
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0:
-                lines = result.stdout.strip().split('\n')[1:]  # Skip header
-                stats = {}
-                for line in lines:
-                    parts = line.split('\t')
-                    if len(parts) >= 4:
-                        container = parts[0]
-                        if container in ["video-worker", "ytipfs-worker"]:
-                            stats[container] = {
-                                "cpu": parts[1],
-                                "memory": parts[2].split(' / ')[0],
-                                "network": parts[3]
-                            }
-                return stats
-        except:
-            pass
+        commands_to_try = [
+            ["docker", "stats", "--no-stream", "--format", 
+             "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"],
+            ["sudo", "docker", "stats", "--no-stream", "--format", 
+             "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"]
+        ]
+        
+        for cmd in commands_to_try:
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=15
+                )
+                if result.returncode == 0:
+                    lines = result.stdout.strip().split('\n')[1:]  # Skip header
+                    stats = {}
+                    for line in lines:
+                        parts = line.split('\t')
+                        if len(parts) >= 4:
+                            container = parts[0]
+                            if container in ["video-worker", "ytipfs-worker"]:
+                                stats[container] = {
+                                    "cpu": parts[1],
+                                    "memory": parts[2].split(' / ')[0],
+                                    "network": parts[3]
+                                }
+                    return stats
+                elif "permission denied" in result.stderr.lower() and cmd[0] != "sudo":
+                    continue  # Try with sudo
+            except subprocess.TimeoutExpired:
+                continue  # Try next command
+            except Exception:
+                continue  # Try next command
         return {}
 
 def create_dashboard_layout() -> Layout:

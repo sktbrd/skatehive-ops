@@ -287,6 +287,9 @@ class ServiceMonitor:
     
     def get_docker_stats(self) -> Dict:
         """Get Docker container resource usage"""
+        stats = {}
+        
+        # Get CPU stats from docker stats
         commands_to_try = [
             ["docker", "stats", "--no-stream", "--format", 
              "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"],
@@ -304,68 +307,71 @@ class ServiceMonitor:
                 )
                 if result.returncode == 0:
                     lines = result.stdout.strip().split('\n')[1:]  # Skip header
-                    stats = {}
                     for line in lines:
                         parts = line.split('\t')
-                        if len(parts) >= 4:
+                        if len(parts) >= 3:
                             container = parts[0]
                             if container in ["video-worker", "ytipfs-worker"]:
-                                # Parse memory usage, handle cases where limit might be 0B
+                                # Get CPU percentage
+                                cpu_percent = parts[1]
+                                
+                                # Get memory usage - if it's 0B / 0B, get actual usage
                                 mem_usage = parts[2]
-                                if " / " in mem_usage:
-                                    actual_mem = mem_usage.split(' / ')[0]
-                                    if actual_mem == "0B":
-                                        # Try to get memory from a different method
-                                        actual_mem = self._get_container_memory_usage(container)
+                                if mem_usage == "0B / 0B" or "0B" in mem_usage:
+                                    mem_usage = self._get_container_memory_usage(container)
                                 else:
-                                    actual_mem = mem_usage
+                                    mem_usage = mem_usage.split(' / ')[0]  # Just the used part
                                 
                                 stats[container] = {
-                                    "cpu": parts[1],
-                                    "memory": actual_mem,
-                                    "network": parts[3]
+                                    "cpu": cpu_percent,
+                                    "memory": mem_usage,
+                                    "network": parts[3] if len(parts) > 3 else "N/A"
                                 }
-                    return stats
+                    break  # Success, don't try with sudo
                 elif "permission denied" in result.stderr.lower() and cmd[0] != "sudo":
                     continue  # Try with sudo
             except subprocess.TimeoutExpired:
                 continue  # Try next command
             except Exception:
                 continue  # Try next command
-        return {}
+        
+        return stats
 
     def _get_container_memory_usage(self, container_name: str) -> str:
-        """Get memory usage directly from container inspect when stats shows 0B"""
+        """Get actual memory usage from container when Docker stats shows 0B"""
         try:
-            cmd = ["docker", "exec", container_name, "cat", "/proc/meminfo"]
+            # Try to get memory usage from /sys/fs/cgroup inside container
+            cmd = ["docker", "exec", container_name, "sh", "-c", 
+                   "if [ -f /sys/fs/cgroup/memory/memory.usage_in_bytes ]; then cat /sys/fs/cgroup/memory/memory.usage_in_bytes; else cat /sys/fs/cgroup/memory.current 2>/dev/null || echo '0'; fi"]
+            
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                for line in result.stdout.split('\n'):
-                    if line.startswith('MemAvailable:'):
-                        # This is a rough estimate - in a real scenario you'd want more precise calculation
-                        mem_kb = int(line.split()[1])
-                        if mem_kb > 1024 * 1024:  # > 1GB
-                            return f"{mem_kb // (1024 * 1024)}GB"
-                        elif mem_kb > 1024:  # > 1MB
-                            return f"{mem_kb // 1024}MB"
-                        else:
-                            return f"{mem_kb}KB"
+            if result.returncode == 0 and result.stdout.strip().isdigit():
+                memory_bytes = int(result.stdout.strip())
+                return self._format_bytes(memory_bytes)
         except:
             pass
         
-        # Fallback: try docker inspect for memory usage
         try:
-            cmd = ["docker", "inspect", container_name, "--format", "{{.HostConfig.Memory}}"]
+            # Alternative: try to get process memory from inside container
+            cmd = ["docker", "exec", container_name, "sh", "-c", 
+                   "ps aux | awk 'NR>1 {sum+=$6} END {print sum*1024}'"]
+            
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            if result.returncode == 0 and result.stdout.strip() != "0":
-                memory_bytes = int(result.stdout.strip())
-                if memory_bytes > 1024 * 1024 * 1024:  # > 1GB
-                    return f"{memory_bytes // (1024 * 1024 * 1024)}GB"
-                elif memory_bytes > 1024 * 1024:  # > 1MB
-                    return f"{memory_bytes // (1024 * 1024)}MB"
-                else:
-                    return f"{memory_bytes // 1024}KB"
+            if result.returncode == 0 and result.stdout.strip().replace('.', '').isdigit():
+                memory_bytes = float(result.stdout.strip())
+                return self._format_bytes(int(memory_bytes))
         except:
             pass
             
         return "N/A"
+    
+    def _format_bytes(self, bytes_value: int) -> str:
+        """Format bytes into human readable format"""
+        if bytes_value >= 1024 * 1024 * 1024:  # GB
+            return f"{bytes_value / (1024 * 1024 * 1024):.1f}GB"
+        elif bytes_value >= 1024 * 1024:  # MB
+            return f"{bytes_value / (1024 * 1024):.1f}MB"
+        elif bytes_value >= 1024:  # KB
+            return f"{bytes_value / 1024:.1f}KB"
+        else:
+            return f"{bytes_value}B"

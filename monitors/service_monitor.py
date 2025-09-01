@@ -60,6 +60,23 @@ class ServiceMonitor:
                     self.hive_stats_error = f"Invalid API response format"
             else:
                 self.hive_stats_error = f"HTTP {response.status_code}"
+        except NameError:
+            # requests module not available, use urllib instead
+            try:
+                import urllib.request
+                import json
+                
+                with urllib.request.urlopen("https://stats.hivehub.dev/communities?c=hive-173115", timeout=10) as response:
+                    data = json.loads(response.read().decode())
+                    if isinstance(data, dict) and 'total_subscribers' in data:
+                        self.hive_stats = data
+                        self.last_hive_stats_fetch = datetime.now()
+                        self.hive_stats_error = None
+                        return data
+                    else:
+                        self.hive_stats_error = "Invalid API response"
+            except Exception as e:
+                self.hive_stats_error = f"urllib: {str(e)[:20]}"
         except requests.exceptions.ConnectionError:
             self.hive_stats_error = "Connection failed"
         except requests.exceptions.Timeout:

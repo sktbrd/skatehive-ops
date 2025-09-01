@@ -27,7 +27,7 @@ class ServiceMonitor:
     def __init__(self):
         self.services = {
             "video-worker": {
-                "url": "http://localhost:8081/health",
+                "url": "http://localhost:8081/healthz",
                 "port": 8081,
                 "container": "video-worker"
             },
@@ -87,16 +87,21 @@ class ServiceMonitor:
                         upload_speed = 0
                         ping_time = 0
                         
+                        # Debug: log the received data structure
+                        console.print(f"[dim]DEBUG: Speedtest JSON keys: {list(data.keys())}[/dim]")
+                        
                         # Ookla speedtest format
                         if "download" in data and "bandwidth" in data["download"]:
                             download_speed = data["download"]["bandwidth"] * 8 / 1_000_000  # Convert bytes to Mbps
                             upload_speed = data["upload"]["bandwidth"] * 8 / 1_000_000
                             ping_time = data["ping"]["latency"]
+                            console.print(f"[dim]DEBUG: Ookla format - D:{download_speed:.1f} U:{upload_speed:.1f} P:{ping_time:.1f}[/dim]")
                         # speedtest-cli format
                         elif "download" in data and isinstance(data["download"], (int, float)):
                             download_speed = data["download"] / 1_000_000
                             upload_speed = data["upload"] / 1_000_000
                             ping_time = data["ping"]
+                            console.print(f"[dim]DEBUG: CLI format - D:{download_speed:.1f} U:{upload_speed:.1f} P:{ping_time:.1f}[/dim]")
                         # Alternative format
                         elif "Download" in data and "Upload" in data:
                             download_speed = float(str(data["Download"]).split()[0])
@@ -286,9 +291,11 @@ def create_internet_panel(monitor: ServiceMonitor) -> Panel:
         upload = monitor.internet_speed.get('upload', 0)
         ping = monitor.internet_speed.get('ping', 0)
         
+        # Debug: show what we actually have
         table.add_row("Download", f"{download:.1f} Mbps")
         table.add_row("Upload", f"{upload:.1f} Mbps")
         table.add_row("Ping", f"{ping:.1f} ms")
+        table.add_row("Debug", f"D:{download} U:{upload} P:{ping}")
         age = datetime.now() - monitor.last_speed_test
         table.add_row("Last Test", f"{int(age.total_seconds()//60)} min ago")
     elif status == "Running test...":

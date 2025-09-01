@@ -253,7 +253,7 @@ def create_dashboard_layout() -> Layout:
     )
     
     layout["left"].split_column(
-        Layout(name="internet", size=8),
+        Layout(name="internet", size=11),
         Layout(name="services", size=12)
     )
     
@@ -291,11 +291,9 @@ def create_internet_panel(monitor: ServiceMonitor) -> Panel:
         upload = monitor.internet_speed.get('upload', 0)
         ping = monitor.internet_speed.get('ping', 0)
         
-        # Debug: show what we actually have
         table.add_row("Download", f"{download:.1f} Mbps")
         table.add_row("Upload", f"{upload:.1f} Mbps")
         table.add_row("Ping", f"{ping:.1f} ms")
-        table.add_row("Debug", f"D:{download} U:{upload} P:{ping}")
         age = datetime.now() - monitor.last_speed_test
         table.add_row("Last Test", f"{int(age.total_seconds()//60)} min ago")
     elif status == "Running test...":

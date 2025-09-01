@@ -54,39 +54,95 @@ class ServiceMonitor:
         """Run internet speed test asynchronously using speedtest"""
         self.speedtest_status = "Running test..."
         self.speedtest_error = None
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "speedtest", "--json",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
+        
+        # Try different speedtest commands
+        commands_to_try = [
+            ["speedtest", "--format=json"],
+            ["speedtest", "--json"],  # fallback for older versions
+            ["speedtest-cli", "--json"],
+            ["/usr/bin/speedtest", "--format=json"],
+            ["/usr/local/bin/speedtest", "--format=json"]
+        ]
+        
+        for cmd in commands_to_try:
             try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
-            except asyncio.TimeoutError:
-                proc.kill()
-                await proc.wait()
-                self.speedtest_status = "Failed"
-                self.speedtest_error = "Timeout"
-                return
-            if proc.returncode == 0:
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
                 try:
-                    data = json.loads(stdout.decode())
-                    self.internet_speed = {
-                        "download": data.get("download", 0) / 1_000_000,
-                        "upload": data.get("upload", 0) / 1_000_000,
-                        "ping": data.get("ping", 0)
-                    }
-                    self.last_speed_test = datetime.now()
-                    self.speedtest_status = "Complete"
-                except Exception as e:
-                    self.speedtest_status = "Failed"
-                    self.speedtest_error = f"JSON error: {e}"
-            else:
-                self.speedtest_status = "Failed"
-                self.speedtest_error = stderr.decode().strip() or "Unknown error"
-        except Exception as e:
-            self.speedtest_status = "Failed"
-            self.speedtest_error = str(e)
+                    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+                except asyncio.TimeoutError:
+                    proc.kill()
+                    await proc.wait()
+                    self.speedtest_error = "Test timeout (>2min)"
+                    continue  # Try next command
+                    
+                if proc.returncode == 0:
+                    try:
+                        data = json.loads(stdout.decode())
+                        # Handle different JSON formats from different speedtest tools
+                        download_speed = 0
+                        upload_speed = 0
+                        ping_time = 0
+                        
+                        # Ookla speedtest format
+                        if "download" in data and "bandwidth" in data["download"]:
+                            download_speed = data["download"]["bandwidth"] * 8 / 1_000_000  # Convert bytes to Mbps
+                            upload_speed = data["upload"]["bandwidth"] * 8 / 1_000_000
+                            ping_time = data["ping"]["latency"]
+                        # speedtest-cli format
+                        elif "download" in data and isinstance(data["download"], (int, float)):
+                            download_speed = data["download"] / 1_000_000
+                            upload_speed = data["upload"] / 1_000_000
+                            ping_time = data["ping"]
+                        # Alternative format
+                        elif "Download" in data and "Upload" in data:
+                            download_speed = float(str(data["Download"]).split()[0])
+                            upload_speed = float(str(data["Upload"]).split()[0])
+                            ping_time = float(str(data.get("Ping", "0")).split()[0])
+                        
+                        self.internet_speed = {
+                            "download": download_speed,
+                            "upload": upload_speed,
+                            "ping": ping_time
+                        }
+                        
+                        self.last_speed_test = datetime.now()
+                        self.speedtest_status = "Complete"
+                        return  # Success, exit function
+                    except Exception as e:
+                        self.speedtest_error = f"JSON parse error: {e}"
+                        continue  # Try next command
+                else:
+                    error_msg = stderr.decode().strip()
+                    if "not found" in error_msg or "command not found" in error_msg:
+                        continue  # Try next command
+                    elif "Timeout occurred" in error_msg:
+                        self.speedtest_error = "Connection timeout"
+                        continue  # Try next command
+                    elif "Error:" in error_msg:
+                        # Extract just the error part, not the full output
+                        error_lines = [line for line in error_msg.split('\n') if 'Error:' in line]
+                        if error_lines:
+                            self.speedtest_error = error_lines[0].replace('[error] Error: ', '').strip()
+                        else:
+                            self.speedtest_error = "Network error"
+                        continue  # Try next command
+                    else:
+                        self.speedtest_error = error_msg or "Command failed"
+                        
+            except FileNotFoundError:
+                continue  # Try next command
+            except Exception as e:
+                self.speedtest_error = str(e)
+                continue  # Try next command
+        
+        # If we get here, all commands failed
+        self.speedtest_status = "Failed"
+        if not self.speedtest_error:
+            self.speedtest_error = "Speedtest command not found or not working"
     
     def check_service_health(self, service_name: str) -> Dict:
         """Check individual service health"""
@@ -235,7 +291,9 @@ def create_internet_panel(monitor: ServiceMonitor) -> Panel:
     elif status == "Failed":
         table.add_row("Speed Test", f"[red]Failed[/red]")
         if monitor.speedtest_error:
-            table.add_row("Error", f"{monitor.speedtest_error}")
+            # Truncate long error messages
+            error_msg = monitor.speedtest_error[:50] + "..." if len(monitor.speedtest_error) > 50 else monitor.speedtest_error
+            table.add_row("Error", f"[red]{error_msg}[/red]")
     else:
         table.add_row("Speed Test", "🔄 Initializing...")
     
@@ -332,19 +390,24 @@ async def main():
         console.print("\n[yellow]Dashboard stopped.[/yellow]")
 
 if __name__ == "__main__":
-    try:
-        # Check dependencies
-        subprocess.run(["speedtest", "--version"], capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        console.print("[red]Error: speedtest-cli not found. Install it with:[/red]")
-        console.print("[yellow]sudo apt install speedtest-cli[/yellow]")
-        exit(1)
+    # Check for speedtest availability (but don't exit if not found, let runtime handle it)
+    speedtest_available = False
+    for cmd in ["speedtest", "speedtest-cli"]:
+        try:
+            subprocess.run([cmd, "--version"], capture_output=True, check=True)
+            speedtest_available = True
+            break
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+    
+    if not speedtest_available:
+        console.print("[yellow]Warning: No speedtest command found. Speed tests will fail.[/yellow]")
+        console.print("[yellow]Install with: sudo apt install speedtest-cli[/yellow]")
     
     try:
         subprocess.run(["docker", "--version"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        console.print("[red]Error: Docker not found or not accessible.[/red]")
-        exit(1)
+        console.print("[yellow]Warning: Docker not found. Container stats will be N/A.[/yellow]")
     
     # Install rich if not available
     try:

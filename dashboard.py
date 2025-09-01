@@ -380,35 +380,59 @@ def create_services_panel(monitor: ServiceMonitor) -> Panel:
 
 def create_logs_panel(monitor: ServiceMonitor, container: str, title: str) -> Panel:
     """Create logs panel for a service"""
-    logs = monitor.get_recent_logs(container, 8)
-    
+    logs = monitor.get_recent_logs(container, 30)  # Get more lines for better context
+
+    # Parse logs for prettified info
+    downloads = []  # (content, user)
+    last_error = None
+    last_error_user = None
+
+    for log in reversed(logs):
+        # Example: "Downloaded content: <content_id> by user: <user_id>"
+        if "downloaded content" in log.lower():
+            # Try to extract content and user
+            import re
+            match = re.search(r"Downloaded content: ([^ ]+) by user: ([^ ]+)", log, re.IGNORECASE)
+            if match:
+                content_id = match.group(1)
+                user_id = match.group(2)
+                downloads.append((content_id, user_id))
+            if len(downloads) >= 5:
+                break
+
+    # Find last error and user
+    for log in reversed(logs):
+        if "error" in log.lower():
+            last_error = log.strip()
+            # Try to extract user from error log
+            import re
+            match = re.search(r"user: ([^ ]+)", log, re.IGNORECASE)
+            if match:
+                last_error_user = match.group(1)
+            break
+
+    # Build human readable output
     log_text = Text()
-    if not logs:
-        log_text.append("No logs available\n", style="dim")
+    if downloads:
+        log_text.append("Latest 5 Downloads:\n", style="bold green")
+        for idx, (content, user) in enumerate(downloads, 1):
+            log_text.append(f"  {idx}. Content: [cyan]{content}[/cyan] by User: [magenta]{user}[/magenta]\n")
     else:
-        for i, log in enumerate(logs[-8:]):  # Show last 8 lines
-            # Don't add timestamp if log already contains error messages
-            if log.startswith("Error") or log.startswith("Container") or log.startswith("Timeout"):
-                style = "red"
-                display_log = log[:100] + "..." if len(log) > 100 else log
-                log_text.append(f"{display_log}\n", style=style)
-            else:
-                # Color code based on log content
-                if "error" in log.lower() or "fail" in log.lower():
-                    style = "red"
-                elif "warning" in log.lower() or "warn" in log.lower():
-                    style = "yellow"
-                elif "success" in log.lower() or "complete" in log.lower():
-                    style = "green"
-                elif "info" in log.lower():
-                    style = "cyan"
-                else:
-                    style = "white"
-                
-                # Truncate long lines but preserve more content
-                display_log = log[:100] + "..." if len(log) > 100 else log
-                log_text.append(f"{display_log}\n", style=style)
-    
+        log_text.append("No recent downloads found.\n", style="dim")
+
+    if last_error:
+        log_text.append("\nLast Error:\n", style="bold red")
+        log_text.append(f"  {last_error}\n", style="red")
+        if last_error_user:
+            log_text.append(f"  User affected: [magenta]{last_error_user}[/magenta]\n")
+    else:
+        log_text.append("\nNo errors found in recent logs.\n", style="dim")
+
+    # Optionally show last 3 raw log lines for context
+    log_text.append("\nRecent Log Lines:\n", style="bold yellow")
+    for log in logs[-3:]:
+        log_text.append(f"  {log}\n", style="white")
+
     return Panel(log_text, title=title, border_style="yellow")
 
 def create_footer_panel() -> Panel:

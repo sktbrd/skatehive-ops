@@ -475,18 +475,25 @@ def create_logs_panel(monitor: ServiceMonitor, container: str, title: str) -> Pa
             # Handle different types of activity
             if user == "system":
                 if timestamp == "completed":
-                    status_color = "green"
-                    status = "✓ completed"
+                    log_text.append(f"  {idx}. ", style="white")
+                    log_text.append(f"{content}", style="cyan")
+                    log_text.append(" ✓ completed", style="green")
+                    log_text.append("\n")
                 elif timestamp == "downloading":
-                    status_color = "yellow" 
-                    status = "⏬ downloading"
+                    log_text.append(f"  {idx}. ", style="white")
+                    log_text.append(f"{content}", style="cyan")
+                    log_text.append(" ⏬ downloading", style="yellow")
+                    log_text.append("\n")
                 elif timestamp == "converted":
-                    status_color = "blue"
-                    status = "🔄 converted"
+                    log_text.append(f"  {idx}. ", style="white")
+                    log_text.append(f"{content}", style="cyan")
+                    log_text.append(" 🔄 converted", style="blue")
+                    log_text.append("\n")
                 else:
-                    status_color = "white"
-                    status = timestamp
-                log_text.append(f"  {idx}. [cyan]{content}[/cyan] [{status_color}]{status}[/{status_color}]\n")
+                    log_text.append(f"  {idx}. ", style="white")
+                    log_text.append(f"{content}", style="cyan")
+                    log_text.append(f" {timestamp}", style="white")
+                    log_text.append("\n")
             else:
                 # User-initiated downloads
                 display_user = user.split('.')[-1] if '.' in user else user[:10]
@@ -503,8 +510,14 @@ def create_logs_panel(monitor: ServiceMonitor, container: str, title: str) -> Pa
                         time_str = "recent"
                 else:
                     time_str = "recent"
-                    
-                log_text.append(f"  {idx}. [cyan]{content}[/cyan] by [magenta]{display_user}[/magenta] at [yellow]{time_str}[/yellow]\n")
+                
+                log_text.append(f"  {idx}. ", style="white")
+                log_text.append(f"{content}", style="cyan")
+                log_text.append(" by ", style="white")
+                log_text.append(f"{display_user}", style="magenta")
+                log_text.append(" at ", style="white")
+                log_text.append(f"{time_str}", style="yellow")
+                log_text.append("\n")
     else:
         log_text.append("No recent downloads found.\n", style="dim")
         log_text.append("Looking for: POST /download, [download] progress, INFO messages\n", style="dim")

@@ -281,9 +281,14 @@ def create_internet_panel(monitor: ServiceMonitor) -> Panel:
     # Speed test status and results
     status = monitor.speedtest_status
     if status == "Complete" and monitor.last_speed_test:
-        table.add_row("Download", f"{monitor.internet_speed['download']:.1f} Mbps")
-        table.add_row("Upload", f"{monitor.internet_speed['upload']:.1f} Mbps")
-        table.add_row("Ping", f"{monitor.internet_speed['ping']:.1f} ms")
+        # Always show all three metrics
+        download = monitor.internet_speed.get('download', 0)
+        upload = monitor.internet_speed.get('upload', 0)
+        ping = monitor.internet_speed.get('ping', 0)
+        
+        table.add_row("Download", f"{download:.1f} Mbps")
+        table.add_row("Upload", f"{upload:.1f} Mbps")
+        table.add_row("Ping", f"{ping:.1f} ms")
         age = datetime.now() - monitor.last_speed_test
         table.add_row("Last Test", f"{int(age.total_seconds()//60)} min ago")
     elif status == "Running test...":
@@ -352,15 +357,15 @@ def create_logs_panel(monitor: ServiceMonitor, container: str, title: str) -> Pa
 
 def create_footer_panel() -> Panel:
     """Create footer panel"""
-    footer_text = Text("Press Ctrl+C to exit | Auto-refresh every 10s | Speed test every 10min", 
+    footer_text = Text("Press Ctrl+C to exit | Auto-refresh every 10s | Speed test every 5min", 
                       style="dim", justify="center")
     return Panel(footer_text, style="bright_black")
 
 async def run_periodic_speed_test(monitor: ServiceMonitor):
-    """Run speed test every 10 minutes asynchronously"""
+    """Run speed test every 5 minutes asynchronously"""
     while True:
         await monitor.run_speed_test_async()
-        await asyncio.sleep(600)  # 10 minutes
+        await asyncio.sleep(300)  # 5 minutes
 
 async def main():
     """Main dashboard loop"""

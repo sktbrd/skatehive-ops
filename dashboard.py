@@ -39,6 +39,8 @@ class ServiceMonitor:
         }
         self.internet_speed = {"download": 0, "upload": 0, "ping": 0}
         self.last_speed_test = None
+        self.speedtest_status = "Initializing..."  # Initial status
+        self.speedtest_error = None
         
     def check_internet_connection(self) -> Dict:
         """Check basic internet connectivity"""
@@ -48,28 +50,43 @@ class ServiceMonitor:
         except:
             return {"status": "🔴 Offline", "latency": "N/A"}
     
-    def run_speed_test(self) -> Dict:
-        """Run internet speed test using speedtest-cli"""
+    async def run_speed_test_async(self):
+        """Run internet speed test asynchronously using speedtest"""
+        self.speedtest_status = "Running test..."
+        self.speedtest_error = None
         try:
-            result = subprocess.run(
-                ["speedtest", "--json"],
-                capture_output=True,
-                text=True,
-                timeout=30
+            proc = await asyncio.create_subprocess_exec(
+                "speedtest", "--json",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
             )
-            if result.returncode == 0:
-                data = json.loads(result.stdout)
-                self.internet_speed = {
-                    "download": data.get("download", 0) / 1_000_000,  # Convert to Mbps
-                    "upload": data.get("upload", 0) / 1_000_000,
-                    "ping": data.get("ping", 0)
-                }
-                self.last_speed_test = datetime.now()
-                return self.internet_speed
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                self.speedtest_status = "Failed"
+                self.speedtest_error = "Timeout"
+                return
+            if proc.returncode == 0:
+                try:
+                    data = json.loads(stdout.decode())
+                    self.internet_speed = {
+                        "download": data.get("download", 0) / 1_000_000,
+                        "upload": data.get("upload", 0) / 1_000_000,
+                        "ping": data.get("ping", 0)
+                    }
+                    self.last_speed_test = datetime.now()
+                    self.speedtest_status = "Complete"
+                except Exception as e:
+                    self.speedtest_status = "Failed"
+                    self.speedtest_error = f"JSON error: {e}"
+            else:
+                self.speedtest_status = "Failed"
+                self.speedtest_error = stderr.decode().strip() or "Unknown error"
         except Exception as e:
-            console.print(f"[red]Speed test failed: {e}[/red]")
-        
-        return {"download": 0, "upload": 0, "ping": 0}
+            self.speedtest_status = "Failed"
+            self.speedtest_error = str(e)
     
     def check_service_health(self, service_name: str) -> Dict:
         """Check individual service health"""
@@ -205,15 +222,20 @@ def create_internet_panel(monitor: ServiceMonitor) -> Panel:
     table.add_row("Connection", conn_status["status"])
     table.add_row("Latency", conn_status["latency"])
     
-    # Speed test results
-    if monitor.last_speed_test:
+    # Speed test status and results
+    status = monitor.speedtest_status
+    if status == "Complete" and monitor.last_speed_test:
+        table.add_row("Download", f"{monitor.internet_speed['download']:.1f} Mbps")
+        table.add_row("Upload", f"{monitor.internet_speed['upload']:.1f} Mbps")
+        table.add_row("Ping", f"{monitor.internet_speed['ping']:.1f} ms")
         age = datetime.now() - monitor.last_speed_test
-        if age.total_seconds() < 300:  # Less than 5 minutes old
-            table.add_row("Download", f"{monitor.internet_speed['download']:.1f} Mbps")
-            table.add_row("Upload", f"{monitor.internet_speed['upload']:.1f} Mbps")
-            table.add_row("Ping", f"{monitor.internet_speed['ping']:.1f} ms")
-        else:
-            table.add_row("Speed Test", "🔄 Running...")
+        table.add_row("Last Test", f"{int(age.total_seconds()//60)} min ago")
+    elif status == "Running test...":
+        table.add_row("Speed Test", "🔄 Running test...")
+    elif status == "Failed":
+        table.add_row("Speed Test", f"[red]Failed[/red]")
+        if monitor.speedtest_error:
+            table.add_row("Error", f"{monitor.speedtest_error}")
     else:
         table.add_row("Speed Test", "🔄 Initializing...")
     
@@ -272,33 +294,27 @@ def create_logs_panel(monitor: ServiceMonitor, container: str, title: str) -> Pa
 
 def create_footer_panel() -> Panel:
     """Create footer panel"""
-    footer_text = Text("Press Ctrl+C to exit | Auto-refresh every 10s | Speed test every 5min", 
+    footer_text = Text("Press Ctrl+C to exit | Auto-refresh every 10s | Speed test every 10min", 
                       style="dim", justify="center")
     return Panel(footer_text, style="bright_black")
 
 async def run_periodic_speed_test(monitor: ServiceMonitor):
-    """Run speed test every 5 minutes"""
+    """Run speed test every 10 minutes asynchronously"""
     while True:
-        await asyncio.sleep(300)  # 5 minutes
-        monitor.run_speed_test()
+        await monitor.run_speed_test_async()
+        await asyncio.sleep(600)  # 10 minutes
 
 async def main():
     """Main dashboard loop"""
     monitor = ServiceMonitor()
-    
-    # Initial speed test
-    console.print("[yellow]Running initial speed test...[/yellow]")
-    monitor.run_speed_test()
-    
     layout = create_dashboard_layout()
-    
+    # Start initial speed test in background
+    initial_speedtest_task = asyncio.create_task(monitor.run_speed_test_async())
     # Start periodic speed test
     speed_test_task = asyncio.create_task(run_periodic_speed_test(monitor))
-    
     try:
         with Live(layout, refresh_per_second=1, screen=True):
             while True:
-                # Update layout components
                 layout["header"].update(create_header_panel())
                 layout["internet"].update(create_internet_panel(monitor))
                 layout["services"].update(create_services_panel(monitor))
@@ -309,11 +325,10 @@ async def main():
                     create_logs_panel(monitor, "ytipfs-worker", "📦 YTIPFS Worker Logs")
                 )
                 layout["footer"].update(create_footer_panel())
-                
-                await asyncio.sleep(10)  # Refresh every 10 seconds
-                
+                await asyncio.sleep(10)
     except KeyboardInterrupt:
         speed_test_task.cancel()
+        initial_speedtest_task.cancel()
         console.print("\n[yellow]Dashboard stopped.[/yellow]")
 
 if __name__ == "__main__":

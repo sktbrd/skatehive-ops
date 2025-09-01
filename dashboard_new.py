@@ -23,10 +23,10 @@ console = Console()
 
 
 async def run_periodic_speed_test(monitor: ServiceMonitor):
-    """Run speed test every 5 minutes asynchronously"""
+    """Run speed test every 15 minutes asynchronously"""
     while True:
         await monitor.run_speed_test_async()
-        await asyncio.sleep(300)  # 5 minutes
+        await asyncio.sleep(900)  # 15 minutes
 
 
 async def main():

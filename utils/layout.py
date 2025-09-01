@@ -55,6 +55,6 @@ def create_header_panel() -> Panel:
 
 def create_footer_panel() -> Panel:
     """Create footer panel"""
-    footer_text = Text("Press Ctrl+C to exit | Auto-refresh every 10s | Speed test every 5min", 
+    footer_text = Text("Press Ctrl+C to exit | Auto-refresh every 10s | Speed test every 15min", 
                       style="dim", justify="center")
     return Panel(footer_text, style="bright_black")

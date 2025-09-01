@@ -52,14 +52,45 @@ class ServiceMonitor:
             import json
             
             with urllib.request.urlopen("https://stats.hivehub.dev/communities?c=hive-173115", timeout=10) as response:
-                data = json.loads(response.read().decode())
-                if isinstance(data, dict) and 'total_subscribers' in data:
-                    self.hive_stats = data
-                    self.last_hive_stats_fetch = datetime.now()
-                    self.hive_stats_error = None
-                    return data
+                raw_data = response.read().decode()
+                data = json.loads(raw_data)
+                
+                # Debug: Let's see what we actually get
+                if isinstance(data, dict):
+                    # Check if it's the expected format or if it's nested
+                    if 'total_subscribers' in data:
+                        self.hive_stats = data
+                        self.last_hive_stats_fetch = datetime.now()
+                        self.hive_stats_error = None
+                        return data
+                    elif isinstance(data, dict) and len(data) > 0:
+                        # Maybe the data is nested? Let's try to find the actual stats
+                        for key, value in data.items():
+                            if isinstance(value, dict) and 'total_subscribers' in value:
+                                self.hive_stats = value
+                                self.last_hive_stats_fetch = datetime.now()
+                                self.hive_stats_error = None
+                                return value
+                        # If we get here, log what keys we found
+                        keys = list(data.keys())[:3]  # First 3 keys
+                        self.hive_stats_error = f"No total_subscribers. Keys: {keys}"
+                    else:
+                        self.hive_stats_error = f"Empty dict response"
+                elif isinstance(data, list) and len(data) > 0:
+                    # Maybe it's a list with the stats inside?
+                    first_item = data[0]
+                    if isinstance(first_item, dict) and 'total_subscribers' in first_item:
+                        self.hive_stats = first_item
+                        self.last_hive_stats_fetch = datetime.now()
+                        self.hive_stats_error = None
+                        return first_item
+                    else:
+                        self.hive_stats_error = f"List but no stats in first item"
                 else:
-                    self.hive_stats_error = "Invalid API response"
+                    self.hive_stats_error = f"Response type: {type(data)}"
+                    
+        except json.JSONDecodeError as e:
+            self.hive_stats_error = f"JSON error: {str(e)[:20]}"
         except Exception as e:
             self.hive_stats_error = f"urllib: {str(e)[:25]}"
         return {}

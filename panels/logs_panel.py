@@ -90,7 +90,6 @@ def create_logs_panel(monitor, container: str, title: str) -> Panel:
     else:
         content_lines.append("")
         content_lines.append("No recent downloads detected")
-            content_lines.append(f"• {download}")
     
     # Show errors if any
     if last_error:

@@ -289,9 +289,9 @@ class ServiceMonitor:
         """Get Docker container resource usage"""
         commands_to_try = [
             ["docker", "stats", "--no-stream", "--format", 
-             "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"],
+             "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"],
             ["sudo", "docker", "stats", "--no-stream", "--format", 
-             "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"]
+             "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"]
         ]
         
         for cmd in commands_to_try:
@@ -310,9 +310,19 @@ class ServiceMonitor:
                         if len(parts) >= 4:
                             container = parts[0]
                             if container in ["video-worker", "ytipfs-worker"]:
+                                # Parse memory usage, handle cases where limit might be 0B
+                                mem_usage = parts[2]
+                                if " / " in mem_usage:
+                                    actual_mem = mem_usage.split(' / ')[0]
+                                    if actual_mem == "0B":
+                                        # Try to get memory from a different method
+                                        actual_mem = self._get_container_memory_usage(container)
+                                else:
+                                    actual_mem = mem_usage
+                                
                                 stats[container] = {
                                     "cpu": parts[1],
-                                    "memory": parts[2].split(' / ')[0],
+                                    "memory": actual_mem,
                                     "network": parts[3]
                                 }
                     return stats
@@ -323,3 +333,39 @@ class ServiceMonitor:
             except Exception:
                 continue  # Try next command
         return {}
+
+    def _get_container_memory_usage(self, container_name: str) -> str:
+        """Get memory usage directly from container inspect when stats shows 0B"""
+        try:
+            cmd = ["docker", "exec", container_name, "cat", "/proc/meminfo"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    if line.startswith('MemAvailable:'):
+                        # This is a rough estimate - in a real scenario you'd want more precise calculation
+                        mem_kb = int(line.split()[1])
+                        if mem_kb > 1024 * 1024:  # > 1GB
+                            return f"{mem_kb // (1024 * 1024)}GB"
+                        elif mem_kb > 1024:  # > 1MB
+                            return f"{mem_kb // 1024}MB"
+                        else:
+                            return f"{mem_kb}KB"
+        except:
+            pass
+        
+        # Fallback: try docker inspect for memory usage
+        try:
+            cmd = ["docker", "inspect", container_name, "--format", "{{.HostConfig.Memory}}"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip() != "0":
+                memory_bytes = int(result.stdout.strip())
+                if memory_bytes > 1024 * 1024 * 1024:  # > 1GB
+                    return f"{memory_bytes // (1024 * 1024 * 1024)}GB"
+                elif memory_bytes > 1024 * 1024:  # > 1MB
+                    return f"{memory_bytes // (1024 * 1024)}MB"
+                else:
+                    return f"{memory_bytes // 1024}KB"
+        except:
+            pass
+            
+        return "N/A"

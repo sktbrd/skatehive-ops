@@ -21,7 +21,8 @@ def create_services_panel(monitor) -> Panel:
     
     for service_name in monitor.services:
         health = monitor.check_service_health(service_name)
-        stats = docker_stats.get(service_name, {"cpu": "N/A", "memory": "N/A"})
+        container_name = monitor.services[service_name]["container"]
+        stats = docker_stats.get(container_name, {"cpu": "N/A", "memory": "N/A"})
         
         # Simple status display
         status = health["status"]

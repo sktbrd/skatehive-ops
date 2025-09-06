@@ -49,9 +49,10 @@ def create_transcoder_panel_with_data(logs, stats, title):
     table = Table(show_header=True, header_style="bold magenta", box=None, pad_edge=False)
     table.add_column("Time", style="cyan", width=8)
     table.add_column("User", style="green", width=12)
-    table.add_column("File", style="yellow", width=20)
-    table.add_column("Status", width=10)
-    table.add_column("Duration", style="blue", width=8)
+    table.add_column("Device", style="blue", width=8)
+    table.add_column("File", style="yellow", width=16)
+    table.add_column("Status", width=8)
+    table.add_column("Duration", style="blue", width=6)
     
     if logs:
         for log in logs:
@@ -62,37 +63,50 @@ def create_transcoder_panel_with_data(logs, stats, title):
             except:
                 time_str = "Unknown"
             
-            # Format user
+            # Format user with HP
             user = log.get('user', 'anonymous')[:11]
+            user_hp = log.get('userHP', 0)
+            if user_hp > 0:
+                hp_emoji = '🔥' if user_hp > 200 else '⚡' if user_hp > 100 else '💫'
+                user = f"{user} {hp_emoji}"
             
-            # Format filename
+            # Format device info
+            platform = log.get('platform', 'unknown')
+            device_info = log.get('deviceInfo', 'unknown')
+            if platform != 'unknown':
+                device_emoji = '📱' if platform == 'mobile' else '📟' if platform == 'tablet' else '💻'
+                device_short = f"{device_emoji}{platform[:3]}"
+            else:
+                device_short = "❓unk"
+            
+            # Format filename (shorter due to device column)
             filename = log.get('filename', 'unknown')
-            if len(filename) > 19:
-                filename = filename[:16] + "..."
+            if len(filename) > 15:
+                filename = filename[:12] + "..."
             
             # Format status with emoji
             status = log.get('status', 'unknown')
             status_emoji = {
-                'started': '🚀 Start',
-                'completed': '✅ Done',
-                'failed': '❌ Error',
-                'processing': '⚙️ Proc',
-                'uploading': '☁️ Upload'
-            }.get(status, f"❓ {status}")
+                'started': '🚀',
+                'completed': '✅', 
+                'failed': '❌',
+                'processing': '⚙️',
+                'uploading': '☁️'
+            }.get(status, f"❓")
             
-            # Format duration
+            # Format duration (shorter)
             duration = log.get('duration')
             if duration:
                 if duration < 1000:
-                    duration_str = f"{duration}ms"
+                    duration_str = f"{duration}ms"[:5]
                 else:
-                    duration_str = f"{duration/1000:.1f}s"
+                    duration_str = f"{duration/1000:.1f}s"[:4]
             else:
                 duration_str = "-"
             
-            table.add_row(time_str, user, filename, status_emoji, duration_str)
+            table.add_row(time_str, user, device_short, filename, status_emoji, duration_str)
     else:
-        table.add_row("", "", "No recent operations", "", "")
+        table.add_row("", "", "", "No recent operations", "", "")
     
     # Create content with stats and table
     content_parts = []

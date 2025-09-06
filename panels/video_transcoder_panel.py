@@ -79,27 +79,25 @@ def create_video_transcoder_panel(monitor, title: str = "📹 Video Transcoder")
             logs = data.get('logs', [])
             stats = data.get('stats', {})
             
-            # Filter to show only completed operations
-            completed_logs = []
+            # Show all operations (completed, failed, and started) for better visibility
+            all_operations = []
             for log in logs:
-                if log.get('action') == 'transcode_complete' or log.get('status') == 'completed':
-                    completed_logs.append(log)
-                elif log.get('action') == 'transcode_start' and log.get('status') == 'error':
-                    # Include failed operations
-                    completed_logs.append(log)
+                # Include all operations, not just completed ones
+                if log.get('status') in ['completed', 'failed', 'started']:
+                    all_operations.append(log)
             
-            # Sort by timestamp descending and take last 5 completed operations
-            completed_logs.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-            recent_logs = completed_logs[:5]
+            # Sort by timestamp descending and take last 5 operations
+            all_operations.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            recent_logs = all_operations[:5]
             
             if not recent_logs:
-                content = "[dim]No transcoding operations completed yet[/dim]"
+                content = "[dim]No operations detected yet[/dim]"
             else:
                 lines = []
                 for log in recent_logs:
                     # Get user info with HP - try both field names
                     user = log.get('user', log.get('creator', 'unknown'))
-                    hp = log.get('userHP', 'unknown')
+                    hp = log.get('userHP', 'N/A')
                     
                     # Parse device info
                     platform = log.get('platform', 'unknown')
@@ -118,6 +116,34 @@ def create_video_transcoder_panel(monitor, title: str = "📹 Video Transcoder")
                             time_str = timestamp[-8:] if len(timestamp) >= 8 else timestamp
                     
                     # Get processing details
+                    filename = log.get('filename', 'unknown')
+                    duration_ms = log.get('duration', 0)
+                    duration_str = f"{duration_ms/1000:.1f}s" if duration_ms > 0 else "..."
+                    
+                    # Status indicators
+                    if status == 'completed':
+                        status_icon = "✅"
+                        status_color = "green"
+                    elif status == 'failed':
+                        status_icon = "❌"
+                        status_color = "red"
+                        # Show error if available
+                        error = log.get('error', '')
+                        if error and len(error) > 50:
+                            error = error[:47] + "..."
+                        duration_str = f"Error: {error}" if error else "Failed"
+                    elif status == 'started':
+                        status_icon = "🔄"
+                        status_color = "yellow"
+                        duration_str = "Processing..."
+                    else:
+                        status_icon = "❓"
+                        status_color = "dim"
+                    
+                    # Format line with rich user info
+                    user_display = f"{user}" if hp == 'N/A' else f"{user} ({hp} HP)"
+                    line = f"{status_icon} [{status_color}]{time_str}[/{status_color}] {device_display} [bold]{user_display}[/bold] - {filename} [{status_color}]{duration_str}[/{status_color}]"
+                    lines.append(line)
                     if status == 'completed':
                         duration = log.get('processingTime', 'unknown')
                         output_size = log.get('outputSize', 'unknown')
@@ -271,5 +297,24 @@ def create_transcoder_panel_with_data(logs, stats, title):
 
 def create_transcoder_panel_error(error_msg, title):
     """Create error panel when service is unavailable"""
-    content = f"⚠️ Video Transcoder Service\n\nStatus: {error_msg}\n\n💡 Check if video-worker is running on port 8081"
+    
+    # Detect specific error types
+    if "Connection refused" in error_msg or "ConnectTimeout" in error_msg:
+        status = "Service Offline"
+        details = "video-worker container not running on port 8081"
+        fix = "💡 Run: docker run -d --name video-worker -p 8081:8080 video-worker"
+    elif "404" in error_msg:
+        status = "API Endpoint Missing"  
+        details = "/logs endpoint not found"
+        fix = "💡 Check video-worker version and API endpoints"
+    elif "timeout" in error_msg.lower():
+        status = "Service Timeout"
+        details = "video-worker not responding"
+        fix = "💡 Check docker logs video-worker"
+    else:
+        status = "Service Error"
+        details = error_msg[:50] + "..." if len(error_msg) > 50 else error_msg
+        fix = "💡 Check service logs and configuration"
+    
+    content = f"⚠️ Video Transcoder Service\n\nStatus: [red]{status}[/red]\nDetails: {details}\n\n{fix}"
     return Panel(content, title=title, border_style="red")

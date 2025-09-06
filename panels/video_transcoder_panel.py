@@ -15,44 +15,52 @@ import json
 def parse_device_display(platform, device_info):
     """Parse device info into a concise display format"""
     
-    # Handle the current format from frontend: "web/MacIntel/desktop"
+    # Handle device info formats: "web/MacIntel/desktop" or "desktop/macOS/Chrome"
     if device_info and '/' in device_info:
         parts = device_info.split('/')
         
-        if len(parts) >= 3:
-            platform_part = parts[0]  # web
-            os_part = parts[1]        # MacIntel, iPhone, etc.
-            device_part = parts[2]    # desktop, mobile, etc.
+        if len(parts) >= 2:
+            first_part = parts[0]   # web, desktop, mobile, tablet
+            second_part = parts[1]  # MacIntel, macOS, iOS, Android, etc.
             
-            # Detect device type and OS
-            if 'iphone' in os_part.lower() or 'ios' in device_info.lower():
-                return "📱 iPhone"
-            elif 'android' in device_info.lower():
-                return "📱 Android"
-            elif 'ipad' in os_part.lower():
-                return "📟 iPad"
-            elif 'mac' in os_part.lower():
-                # Try to detect browser from additional info if available
-                return "💻 Mac"
-            elif 'win' in os_part.lower() or 'windows' in device_info.lower():
-                return "💻 Win"
-            elif 'linux' in device_info.lower():
-                return "💻 Linux"
-            else:
-                # Fallback to platform detection
-                if platform == 'mobile' or device_part == 'mobile':
-                    return "📱 Mobile"
-                elif platform == 'tablet' or device_part == 'tablet':
-                    return "📟 Tablet"
+            # NEW enhanced format: "desktop/macOS/Chrome"
+            if first_part in ['desktop', 'mobile', 'tablet']:
+                if 'macOS' in second_part:
+                    return "💻 Mac"
+                elif 'Windows' in second_part:
+                    return "💻 Win"
+                elif 'Linux' in second_part:
+                    return "� Linux"
+                elif 'iOS' in second_part:
+                    return "📱 iPhone" if first_part == 'mobile' else "📟 iPad"
+                elif 'Android' in second_part:
+                    return "� Android"
                 else:
-                    return "💻 Desktop"
+                    # Fallback based on device type
+                    if first_part == 'mobile':
+                        return "� Mobile"
+                    elif first_part == 'tablet':
+                        return "� Tablet"
+                    else:
+                        return "💻 Desktop"
+            
+            # OLD format: "web/MacIntel/desktop"
+            elif first_part == 'web':
+                if 'mac' in second_part.lower():
+                    return "💻 Mac"
+                elif 'win' in second_part.lower():
+                    return "� Win"
+                elif 'linux' in second_part.lower():
+                    return "� Linux"
+                else:
+                    return "💻 Web"
     
-    # Fallback for older format or unknown
+    # Fallback for platform only
     if platform == 'mobile':
         return "📱 Mobile"
     elif platform == 'tablet':
         return "📟 Tablet"
-    elif platform == 'web' or platform == 'desktop':
+    elif platform in ['web', 'desktop']:
         return "💻 Web"
     else:
         return "❓ Unknown"
@@ -89,8 +97,8 @@ def create_video_transcoder_panel(monitor, title: str = "📹 Video Transcoder")
             else:
                 lines = []
                 for log in recent_logs:
-                    # Get user info with HP
-                    user = log.get('creator', 'unknown')
+                    # Get user info with HP - try both field names
+                    user = log.get('user', log.get('creator', 'unknown'))
                     hp = log.get('userHP', 'unknown')
                     
                     # Parse device info

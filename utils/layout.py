@@ -22,20 +22,20 @@ def create_dashboard_layout() -> Layout:
     )
     
     layout["main"].split_row(
-        Layout(name="left", ratio=4),
-        Layout(name="right", ratio=3)
+        Layout(name="left", ratio=2),
+        Layout(name="right", ratio=5)
     )
     
     layout["left"].split_column(
-        Layout(name="internet", size=10),
-        Layout(name="services", size=9),
-        Layout(name="hive_stats", size=15)
+        Layout(name="internet", size=8),
+        Layout(name="services", size=7),
+        Layout(name="hive_stats", size=12)
     )
     
     layout["right"].split_column(
-        Layout(name="video_transcoder", size=12),
-        Layout(name="top_logs", size=12),
-        Layout(name="bottom_logs", size=12)
+        Layout(name="video_transcoder", size=18),
+        Layout(name="top_logs", size=9),
+        Layout(name="bottom_logs", size=9)
     )
     
     return layout

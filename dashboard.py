@@ -18,6 +18,7 @@ from panels.services_panel import create_services_panel
 from panels.hive_stats_panel import create_hive_stats_panel
 from panels.logs_panel import create_logs_panel
 from panels.video_transcoder_panel import create_video_transcoder_panel
+from panels.instagram_panel import create_instagram_panel
 from utils.layout import create_dashboard_layout, create_header_panel, create_footer_panel
 
 console = Console()
@@ -47,6 +48,7 @@ async def main():
                 layout["header"].update(create_header_panel())
                 layout["internet"].update(create_internet_panel(monitor))
                 layout["services"].update(create_services_panel(monitor))
+                layout["instagram"].update(create_instagram_panel(monitor))
                 layout["hive_stats"].update(create_hive_stats_panel(monitor))
                 layout["video_transcoder"].update(create_video_transcoder_panel(monitor))
                 layout["top_logs"].update(

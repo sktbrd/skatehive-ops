@@ -33,8 +33,9 @@ def create_dashboard_layout() -> Layout:
     )
     
     layout["right"].split_column(
-        Layout(name="top_logs", size=15),
-        Layout(name="bottom_logs", size=15)
+        Layout(name="video_transcoder", size=12),
+        Layout(name="top_logs", size=12),
+        Layout(name="bottom_logs", size=12)
     )
     
     return layout

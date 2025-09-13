@@ -43,8 +43,8 @@ def test_basic_endpoints():
     
     endpoints = [
         ("NAS", "https://raspberrypi.tail83ea3e.ts.net/"),
-        ("Instagram Health", "https://raspberrypi.tail83ea3e.ts.net/download/health"),
-        ("Video Transcoder Health", "https://raspberrypi.tail83ea3e.ts.net/transcode/healthz"),
+        ("Instagram Health", "https://raspberrypi.tail83ea3e.ts.net/instagram/health"),
+        ("Video Transcoder Health", "https://raspberrypi.tail83ea3e.ts.net/video/healthz"),
     ]
     
     results = []

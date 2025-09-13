@@ -16,16 +16,32 @@ import requests
 
 class ServiceMonitor:
     def __init__(self):
+        # Public Tailscale Funnel endpoints
+        self.base_url = "https://raspberrypi.tail83ea3e.ts.net"
+        
         self.services = {
-            "video-worker": {
-                "url": "http://localhost:8081/healthz",
-                "port": 8081,
-                "container": "video-worker"
+            "nas": {
+                "url": f"{self.base_url}/",
+                "port": 80,
+                "container": "nginx",  # or "openmediavault" if that's the container name
+                "check_type": "http_status",
+                "expected_status": 200
             },
             "ytipfs-worker": {
-                "url": "http://localhost:6666/health",
+                "url": f"{self.base_url}/download/health",
                 "port": 6666,
-                "container": "ytipfs-worker"
+                "container": "ytipfs-worker",
+                "check_type": "json_key",
+                "expected_key": "status",
+                "expected_value": "ok"
+            },
+            "video-worker": {
+                "url": f"{self.base_url}/transcode/healthz",
+                "port": 8081,
+                "container": "video-worker",
+                "check_type": "json_key",
+                "expected_key": "ok",
+                "expected_value": True
             }
         }
         self.internet_speed = {"download": 0, "upload": 0, "ping": 0}
@@ -190,24 +206,86 @@ class ServiceMonitor:
             self.speedtest_error = "Speedtest command not found or not working"
     
     def check_service_health(self, service_name: str) -> Dict:
-        """Check individual service health"""
+        """Check individual service health with different validation methods"""
         service = self.services[service_name]
         try:
-            response = requests.get(service["url"], timeout=5)
-            if response.status_code == 200:
-                return {
-                    "status": "🟢 Healthy",
-                    "response_time": f"{response.elapsed.total_seconds()*1000:.0f}ms",
-                    "uptime": self.get_container_uptime(service["container"])
-                }
-        except requests.exceptions.RequestException:
-            pass
-        
-        return {
-            "status": "🔴 Down", 
-            "response_time": "N/A",
-            "uptime": "N/A"
-        }
+            response = requests.get(service["url"], timeout=10)
+            response_time = f"{response.elapsed.total_seconds()*1000:.0f}ms"
+            
+            # Handle different check types
+            check_type = service.get("check_type", "http_status")
+            
+            if check_type == "http_status":
+                # Just check HTTP status code
+                expected_status = service.get("expected_status", 200)
+                if response.status_code == expected_status:
+                    return {
+                        "status": "🟢 Healthy",
+                        "response_time": response_time,
+                        "uptime": self.get_container_uptime(service["container"]),
+                        "details": f"HTTP {response.status_code}"
+                    }
+                else:
+                    return {
+                        "status": "🔴 Down",
+                        "response_time": response_time,
+                        "uptime": "N/A",
+                        "details": f"HTTP {response.status_code} (expected {expected_status})"
+                    }
+                    
+            elif check_type == "json_key":
+                # Check for specific key-value in JSON response
+                if response.status_code == 200:
+                    try:
+                        data = response.json()
+                        expected_key = service.get("expected_key")
+                        expected_value = service.get("expected_value")
+                        
+                        if expected_key in data and data[expected_key] == expected_value:
+                            return {
+                                "status": "🟢 Healthy",
+                                "response_time": response_time,
+                                "uptime": self.get_container_uptime(service["container"]),
+                                "details": f"JSON OK: {expected_key}={data[expected_key]}"
+                            }
+                        else:
+                            actual_value = data.get(expected_key, "missing")
+                            return {
+                                "status": "🔴 Down",
+                                "response_time": response_time,
+                                "uptime": "N/A",
+                                "details": f"JSON fail: {expected_key}={actual_value} (expected {expected_value})"
+                            }
+                    except ValueError:
+                        return {
+                            "status": "🔴 Down",
+                            "response_time": response_time,
+                            "uptime": "N/A",
+                            "details": "Invalid JSON response"
+                        }
+                else:
+                    return {
+                        "status": "🔴 Down",
+                        "response_time": response_time,
+                        "uptime": "N/A",
+                        "details": f"HTTP {response.status_code}"
+                    }
+                    
+        except requests.exceptions.RequestException as e:
+            error_msg = str(e)
+            if "timeout" in error_msg.lower():
+                details = "Connection timeout"
+            elif "connection" in error_msg.lower():
+                details = "Connection refused"
+            else:
+                details = f"Network error: {error_msg[:30]}"
+                
+            return {
+                "status": "🔴 Down", 
+                "response_time": "N/A",
+                "uptime": "N/A",
+                "details": details
+            }
     
     def get_container_uptime(self, container_name: str) -> str:
         """Get Docker container uptime"""

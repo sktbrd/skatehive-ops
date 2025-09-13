@@ -72,8 +72,8 @@ def create_video_transcoder_panel(monitor, title: str = "📹 Video Transcoder")
     try:
         import requests
         
-        # Fetch logs from video-worker service
-        response = requests.get('http://localhost:8081/logs?limit=5', timeout=3)
+        # Fetch logs from video-worker service via Tailscale Funnel
+        response = requests.get('https://raspberrypi.tail83ea3e.ts.net/transcode/logs?limit=10', timeout=10)
         if response.status_code == 200:
             data = response.json()
             logs = data.get('logs', [])
@@ -127,11 +127,28 @@ def create_video_transcoder_panel(monitor, title: str = "📹 Video Transcoder")
                     elif status == 'failed':
                         status_icon = "❌"
                         status_color = "red"
-                        # Show error if available
+                        # Show detailed error if available
                         error = log.get('error', '')
-                        if error and len(error) > 50:
-                            error = error[:47] + "..."
-                        duration_str = f"Error: {error}" if error else "Failed"
+                        error_message = log.get('message', '')
+                        error_details = error or error_message or 'Unknown error'
+                        
+                        # Extract meaningful error info
+                        if 'timeout' in error_details.lower():
+                            error_short = "Timeout"
+                        elif 'memory' in error_details.lower():
+                            error_short = "Memory issue"
+                        elif 'codec' in error_details.lower():
+                            error_short = "Codec error"
+                        elif 'permission' in error_details.lower():
+                            error_short = "Permission denied"
+                        elif 'space' in error_details.lower():
+                            error_short = "No disk space"
+                        elif len(error_details) > 40:
+                            error_short = error_details[:37] + "..."
+                        else:
+                            error_short = error_details
+                        
+                        duration_str = f"[red]ERROR:[/red] {error_short}"
                     elif status == 'started':
                         status_icon = "🔄"
                         status_color = "yellow"

@@ -6,11 +6,25 @@ Displays Instagram service health, cookie status, and recent downloads
 
 import json
 import requests
+import subprocess
+import asyncio
 from datetime import datetime
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich import box
+from rich.align import Align
+
+
+def get_instagram_logs():
+    """Fetch Instagram download logs from the service"""
+    try:
+        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/download/logs", timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        return {"logs": [], "error": f"HTTP {response.status_code}"}
+    except Exception as e:
+        return {"logs": [], "error": str(e)}
 
 
 def create_instagram_panel(monitor):
@@ -24,21 +38,20 @@ def create_instagram_panel(monitor):
     
     try:
         # Check Instagram service health
-        local_health = check_service_health("http://localhost:8000")
-        tailscale_health = check_service_health("http://raspberrypi.tail83ea3e.ts.net:8000")
+        tailscale_health = check_service_health("https://raspberrypi.tail83ea3e.ts.net/download")
         render_health = check_service_health("https://skate-insta.onrender.com")
         
         # Service Status
         table.add_row(
-            "🐳 Local Service",
-            "🟢 UP" if local_health['status'] else "🔴 DOWN",
-            f"localhost:8000 - {local_health.get('version', 'Unknown')}"
+            "🌐 Primary Service",
+            "🟢 UP" if tailscale_health['status'] else "🔴 DOWN",
+            f"raspberrypi.tail83ea3e.ts.net - {tailscale_health.get('version', 'Unknown')}"
         )
         
         table.add_row(
             "🌐 Tailscale Service", 
             "🟢 UP" if tailscale_health['status'] else "🔴 DOWN",
-            f"raspberrypi.tail83ea3e.ts.net:8000"
+            f"Primary endpoint via Tailscale Funnel"
         )
         
         table.add_row(
@@ -49,9 +62,9 @@ def create_instagram_panel(monitor):
         
         table.add_row("", "", "")  # Separator
         
-        # Cookie Health (from local service)
-        if local_health['status'] and 'authentication' in local_health.get('data', {}):
-            auth = local_health['data']['authentication']
+        # Cookie Health (from primary service)
+        if tailscale_health['status'] and 'authentication' in tailscale_health.get('data', {}):
+            auth = tailscale_health['data']['authentication']
             cookies_valid = auth.get('cookies_valid', False)
             cookies_exist = auth.get('cookies_exist', False)
             last_validation = auth.get('last_validation', 'Never')
@@ -135,7 +148,7 @@ def check_service_health(url):
 def check_cookie_expiry():
     """Check Instagram cookie expiry status"""
     try:
-        response = requests.get("http://localhost:8000/cookies/status", timeout=3)
+        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/download/cookies/status", timeout=10)
         if response.status_code == 200:
             data = response.json()
             
@@ -217,3 +230,123 @@ def format_timestamp(timestamp_str):
         return dt.strftime('%Y-%m-%d %H:%M:%S')
     except Exception:
         return str(timestamp_str)[:19]  # Truncate if parsing fails
+
+
+def create_instagram_logs_panel(monitor):
+    """Create Instagram download logs panel (similar to video transcoder)"""
+    try:
+        # Get Instagram logs
+        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/download/logs", timeout=10)
+        if response.status_code != 200:
+            return Panel(
+                Align.center("❌ Could not fetch Instagram logs"),
+                title="📱 Instagram Download Logs",
+                border_style="red"
+            )
+        
+        logs_data = response.json()
+        logs = logs_data.get("logs", [])
+        
+        # Filter out processing entries, only show completed/failed
+        completed_logs = [log for log in logs if log.get('status') in ['completed', 'failed']]
+        
+        if not completed_logs:
+            return Panel(
+                Align.center("No Instagram downloads yet"),
+                title="📱 Instagram Download Logs",
+                border_style="blue"
+            )
+        
+        # Create content similar to video transcoder logs
+        content = []
+        
+        for log in completed_logs[:10]:  # Show last 10 downloads
+            try:
+                timestamp = log.get('timestamp', '')
+                status = log.get('status', 'unknown')
+                success = log.get('success', False)
+                url = log.get('url', '')
+                filename = log.get('filename', 'N/A')
+                duration = log.get('duration', 0)
+                
+                # Format timestamp
+                if timestamp:
+                    dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    time_str = dt.strftime('%H:%M:%S')
+                else:
+                    time_str = "Unknown"
+                
+                # Format URL (extract Instagram post ID)
+                if 'instagram.com/p/' in url:
+                    post_id = url.split('/p/')[-1].split('/')[0]
+                    url_display = f"instagram.com/p/{post_id}"
+                else:
+                    url_display = url[:40] + "..." if len(url) > 40 else url
+                
+                # Format filename
+                if len(filename) > 30:
+                    filename_display = filename[:27] + "..."
+                else:
+                    filename_display = filename
+                
+                # Format duration
+                duration_str = f"{duration/1000:.1f}s" if duration else "N/A"
+                
+                # Status icon and error handling
+                if status == "completed" and success:
+                    status_icon = "✅"
+                    log_line = f"{status_icon} {time_str} {url_display} - {filename_display} {duration_str}"
+                elif status == "failed" or not success:
+                    status_icon = "❌"
+                    # Get error details and categorize them
+                    error = log.get('error', log.get('message', 'Unknown error'))
+                    
+                    # Categorize common errors
+                    if 'private' in error.lower():
+                        error_short = "Private account"
+                    elif 'not found' in error.lower() or '404' in error:
+                        error_short = "Post not found"
+                    elif 'timeout' in error.lower():
+                        error_short = "Connection timeout"
+                    elif 'rate limit' in error.lower() or 'too many' in error.lower():
+                        error_short = "Rate limited"
+                    elif 'cookie' in error.lower() or 'auth' in error.lower():
+                        error_short = "Authentication issue"
+                    elif 'network' in error.lower() or 'connection' in error.lower():
+                        error_short = "Network error"
+                    elif len(error) > 40:
+                        error_short = error[:37] + "..."
+                    else:
+                        error_short = error
+                    
+                    log_line = f"{status_icon} {time_str} {url_display} - [red]ERROR:[/red] {error_short}"
+                else:
+                    status_icon = "⚠️"
+                    log_line = f"{status_icon} {time_str} {url_display} - {filename_display} {duration_str}"
+                
+                content.append(log_line)
+                
+            except Exception as e:
+                content.append(f"❌ Error parsing log entry: {str(e)}")
+        
+        # Add stats
+        total = len(completed_logs)
+        success_count = len([l for l in completed_logs if l.get('success', False)])
+        failure_count = total - success_count
+        success_rate = (success_count / total * 100) if total > 0 else 0
+        
+        stats_line = f"\n📊 Total: {total} | Success: {success_count} | Failed: {failure_count} | Rate: {success_rate:.1f}%"
+        content.append(stats_line)
+        
+        return Panel(
+            "\n".join(content),
+            title="📱 Instagram Download Logs",
+            border_style="blue"
+        )
+        
+    except Exception as e:
+        return Panel(
+            Align.center(f"❌ Error: {str(e)}"),
+            title="📱 Instagram Download Logs",
+            border_style="red"
+        )

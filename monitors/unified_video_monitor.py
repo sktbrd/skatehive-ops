@@ -112,7 +112,13 @@ class UnifiedVideoActivityMonitor:
                 all_logs.extend(result)
         
         # Sort by timestamp (newest first)
-        all_logs.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        def safe_timestamp_sort(log):
+            timestamp = log.get('timestamp', '')
+            if not timestamp:
+                return '1970-01-01T00:00:00Z'  # Default very old timestamp
+            return timestamp
+        
+        all_logs.sort(key=safe_timestamp_sort, reverse=True)
         
         # Keep last 20 operations across all services
         self.unified_logs = all_logs[:20]

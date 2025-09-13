@@ -10,7 +10,7 @@ import time
 import os
 from datetime import datetime
 
-BASE_URL = "https://raspberrypi.tail83ea3e.ts.net/download"
+BASE_URL = "https://raspberrypi.tail83ea3e.ts.net/instagram"
 
 # Test Instagram URLs (these should be public posts)
 TEST_URLS = [

@@ -62,7 +62,7 @@ def test_video_transcoding():
             
             print(f"   📤 Sending transcode request...")
             
-            response = requests.post(f"{base_url}/transcode", 
+            response = requests.post(f"{base_url}/video/transcode", 
                                    json=data, 
                                    timeout=120)  # Video transcoding can take time
             
@@ -150,7 +150,7 @@ def test_video_transcoding():
     # Check logs after tests
     print("\n🔍 Checking recent transcode logs...")
     try:
-        response = requests.get(f"{base_url}/transcode/logs", timeout=10)
+        response = requests.get(f"{base_url}/video/logs", timeout=10)
         if response.status_code == 200:
             logs = response.json()
             
@@ -195,7 +195,7 @@ def test_video_transcoding():
     # Test health endpoint
     print("\n🏥 Testing health endpoint...")
     try:
-        response = requests.get(f"{base_url}/transcode/healthz", timeout=10)
+        response = requests.get(f"{base_url}/video/healthz", timeout=10)
         if response.status_code == 200:
             health = response.json()
             print(f"   ✅ Health: {health}")

@@ -202,6 +202,15 @@ def create_unified_video_activity_panel():
         
         content = header + "\n" + str(table)
         
+        # Render table properly using Rich console
+        from rich.console import Console
+        from io import StringIO
+        temp_console = Console(file=StringIO(), width=140)  # Use wider width for full table
+        temp_console.print(table)
+        table_str = temp_console.file.getvalue()
+        
+        content = header + "\n" + table_str
+        
         # Update time info
         if last_update:
             try:

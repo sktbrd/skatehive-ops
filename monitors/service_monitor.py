@@ -44,12 +44,12 @@ class ServiceMonitor:
                 "expected_value": True
             },
             "macmini-video": {
-                "url": "https://macmini.tail83ea3e.ts.net/health",
-                "port": 80,
-                "container": "macmini-transcoder",
-                "check_type": "tailscale_device",
-                "tailscale_name": "macmini",
-                "service_url": "https://macmini.tail83ea3e.ts.net/health"
+                "url": "https://minivlad.tail9656d3.ts.net/video/healthz",
+                "port": 443,
+                "container": "skatehive-video-transcoder-video-worker-1",
+                "check_type": "json_key",
+                "expected_key": "ok",
+                "expected_value": True
             }
         }
         self.internet_speed = {"download": 0, "upload": 0, "ping": 0}

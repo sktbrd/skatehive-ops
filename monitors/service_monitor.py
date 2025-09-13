@@ -28,7 +28,7 @@ class ServiceMonitor:
                 "expected_status": 200
             },
             "ytipfs-worker": {
-                "url": f"{self.base_url}/download/health",
+                "url": f"{self.base_url}/instagram/health",
                 "port": 6666,
                 "container": "ytipfs-worker",
                 "check_type": "json_key",
@@ -36,7 +36,7 @@ class ServiceMonitor:
                 "expected_value": "ok"
             },
             "video-worker": {
-                "url": f"{self.base_url}/transcode/healthz",
+                "url": f"{self.base_url}/video/healthz",
                 "port": 8081,
                 "container": "video-worker",
                 "check_type": "json_key",

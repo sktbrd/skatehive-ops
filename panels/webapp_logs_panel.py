@@ -19,30 +19,36 @@ class WebappErrorTracker:
     """Track and manage client-side errors from the webapp"""
     
     def __init__(self):
-        # URL to the Mac Mini hosting the Next.js app
-        self.base_url = "https://minivlad.tail9656d3.ts.net"
+        # Try localhost first (for development), fallback to production URL
+        self.base_urls = [
+            "http://localhost:3000",  # Development server
+            "https://minivlad.tail9656d3.ts.net"  # Production Mac Mini
+        ]
+        self.active_url = None
         self.error_cache = []
         self.last_error_check = None
     
     def get_webapp_errors(self, limit: int = 50) -> List[Dict]:
         """Get recent client errors from the webapp"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/logs/client-errors?limit={limit}", 
-                timeout=10
-            )
-            if response.status_code == 200:
-                data = response.json()
-                self.error_cache = data.get('logs', [])
-                self.last_error_check = datetime.now()
-                return self.error_cache
-            else:
-                # If we can't reach the webapp, return cached data
-                return self.error_cache
+        for base_url in self.base_urls:
+            try:
+                response = requests.get(
+                    f"{base_url}/api/logs/client-errors?limit={limit}", 
+                    timeout=5
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    self.error_cache = data.get('logs', [])
+                    self.last_error_check = datetime.now()
+                    self.active_url = base_url
+                    return self.error_cache
                 
-        except Exception as e:
-            print(f"⚠️ Failed to fetch webapp errors: {e}")
-            return self.error_cache
+            except Exception as e:
+                # Try next URL
+                continue
+        
+        # If all URLs failed, return cached data
+        return self.error_cache
     
     def get_error_summary(self) -> Dict:
         """Get summary of error types and counts"""

@@ -13,6 +13,7 @@ from rich.live import Live
 
 # Import our modules
 from monitors.service_monitor import ServiceMonitor
+from monitors.unified_video_monitor import get_unified_video_activity
 from panels.internet_panel import create_internet_panel
 from panels.nas_panel import create_nas_panel
 from panels.services_panel import create_services_panel
@@ -20,6 +21,7 @@ from panels.error_monitor_panel import create_error_monitor_panel
 from panels.hive_stats_panel import create_hive_stats_panel
 from panels.logs_panel import create_logs_panel
 from panels.video_transcoder_panel import create_video_transcoder_panel
+from panels.unified_video_activity_panel import create_unified_video_activity_panel
 from panels.instagram_panel import create_instagram_panel, create_instagram_logs_panel
 # Utils
 from utils.layout import (
@@ -42,6 +44,16 @@ async def run_periodic_speed_test(monitor: ServiceMonitor):
         await asyncio.sleep(900)  # 15 minutes
 
 
+async def update_unified_video_activity():
+    """Update unified video activity every 30 seconds"""
+    while True:
+        try:
+            await get_unified_video_activity()
+        except Exception as e:
+            console.print(f"[red]Error updating video activity: {e}[/red]")
+        await asyncio.sleep(30)  # Update every 30 seconds
+
+
 async def main():
     """Main dashboard loop with responsive design"""
     monitor = ServiceMonitor()
@@ -62,6 +74,8 @@ async def main():
     initial_speedtest_task = asyncio.create_task(monitor.run_speed_test_async())
     # Start periodic speed test
     speed_test_task = asyncio.create_task(run_periodic_speed_test(monitor))
+    # Start unified video activity monitoring
+    video_activity_task = asyncio.create_task(update_unified_video_activity())
     
     try:
         with Live(layout, refresh_per_second=1, screen=True, auto_refresh=True):
@@ -111,7 +125,7 @@ async def main():
                         pass
                     
                     try:
-                        layout["video_transcoder"].update(create_video_transcoder_panel(monitor))
+                        layout["video_transcoder"].update(create_unified_video_activity_panel())
                     except KeyError:
                         pass
                     
@@ -144,6 +158,7 @@ async def main():
     except KeyboardInterrupt:
         speed_test_task.cancel()
         initial_speedtest_task.cancel()
+        video_activity_task.cancel()
         console.print("\n[yellow]Dashboard stopped.[/yellow]")
 
 

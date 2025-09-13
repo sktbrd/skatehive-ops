@@ -76,11 +76,11 @@ def test_endpoints_quickly():
     import requests
     
     endpoints = [
-        ("NAS", "https://raspberrypi.tail83ea3e.ts.net/"),
-        ("Instagram Health", "https://raspberrypi.tail83ea3e.ts.net/download/health"),
-        ("Video Transcoder Health", "https://raspberrypi.tail83ea3e.ts.net/transcode/healthz"),
-        ("Instagram Logs", "https://raspberrypi.tail83ea3e.ts.net/download/logs"),
-        ("Video Transcoder Logs", "https://raspberrypi.tail83ea3e.ts.net/transcode/logs")
+        ("NAS", "https://raspberrypi.tail83ea3e.ts.net/nas/"),
+        ("Instagram Health", "https://raspberrypi.tail83ea3e.ts.net/instagram/health"),
+        ("Video Transcoder Health", "https://raspberrypi.tail83ea3e.ts.net/video/healthz"),
+        ("Instagram Logs", "https://raspberrypi.tail83ea3e.ts.net/instagram/logs"),
+        ("Video Transcoder Logs", "https://raspberrypi.tail83ea3e.ts.net/video/logs")
     ]
     
     all_healthy = True

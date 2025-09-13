@@ -42,6 +42,14 @@ class ServiceMonitor:
                 "check_type": "json_key",
                 "expected_key": "ok",
                 "expected_value": True
+            },
+            "macmini-video": {
+                "url": "https://macmini.tail83ea3e.ts.net/health",
+                "port": 80,
+                "container": "macmini-transcoder",
+                "check_type": "tailscale_device",
+                "tailscale_name": "macmini",
+                "service_url": "https://macmini.tail83ea3e.ts.net/health"
             }
         }
         self.internet_speed = {"download": 0, "upload": 0, "ping": 0}
@@ -271,7 +279,76 @@ class ServiceMonitor:
                         "details": f"HTTP {response.status_code}"
                     }
                     
+            elif check_type == "tailscale_device":
+                # Check Tailscale device status first, then service health
+                tailscale_name = service.get("tailscale_name")
+                device_status = self.check_tailscale_device(tailscale_name)
+                
+                if not device_status["online"]:
+                    return {
+                        "status": "🔴 Offline",
+                        "response_time": "N/A",
+                        "uptime": "N/A", 
+                        "details": f"Tailscale device offline: {device_status['status']}"
+                    }
+                
+                # Device is online, now check service health
+                if response.status_code == 200:
+                    try:
+                        # Try to parse as JSON for health check
+                        data = response.json()
+                        return {
+                            "status": "🟢 Online + Service Healthy",
+                            "response_time": response_time,
+                            "uptime": device_status.get("uptime", "Unknown"),
+                            "details": f"Device online, service responding"
+                        }
+                    except ValueError:
+                        # Not JSON, but HTTP 200 is still good
+                        return {
+                            "status": "🟡 Online + Service Limited", 
+                            "response_time": response_time,
+                            "uptime": device_status.get("uptime", "Unknown"),
+                            "details": f"Device online, HTTP {response.status_code}"
+                        }
+                else:
+                    return {
+                        "status": "🟡 Online + Service Down",
+                        "response_time": response_time,
+                        "uptime": device_status.get("uptime", "Unknown"), 
+                        "details": f"Device online, HTTP {response.status_code}"
+                    }
+                    
         except requests.exceptions.RequestException as e:
+            # For Tailscale devices, check device status even if service is unreachable
+            if service.get("check_type") == "tailscale_device":
+                tailscale_name = service.get("tailscale_name")
+                device_status = self.check_tailscale_device(tailscale_name)
+                
+                if device_status["online"]:
+                    error_msg = str(e)
+                    if "timeout" in error_msg.lower():
+                        details = "Device online, service timeout"
+                    elif "connection" in error_msg.lower():
+                        details = "Device online, service unreachable"
+                    else:
+                        details = f"Device online, service error: {error_msg[:30]}"
+                    
+                    return {
+                        "status": "🟡 Online + Service Down",
+                        "response_time": "N/A",
+                        "uptime": device_status.get("uptime", "Unknown"),
+                        "details": details
+                    }
+                else:
+                    return {
+                        "status": "🔴 Offline",
+                        "response_time": "N/A",
+                        "uptime": "N/A",
+                        "details": f"Tailscale device offline: {device_status['status']}"
+                    }
+            
+            # Standard error handling for other services
             error_msg = str(e)
             if "timeout" in error_msg.lower():
                 details = "Connection timeout"
@@ -362,6 +439,68 @@ class ServiceMonitor:
                 return [f"Error: {str(e)}"]
         
         return ["No logs available"]
+    
+    def check_tailscale_device(self, device_name: str) -> Dict:
+        """Check if a Tailscale device is online and get its status"""
+        try:
+            result = subprocess.run(
+                ["tailscale", "status", "--json"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode != 0:
+                return {
+                    "online": False,
+                    "status": "tailscale command failed",
+                    "uptime": "N/A"
+                }
+            
+            # Parse Tailscale JSON status
+            import json
+            tailscale_data = json.loads(result.stdout)
+            
+            # Look for the device in the peer list
+            for peer_id, peer_info in tailscale_data.get("Peer", {}).items():
+                if peer_info.get("HostName") == device_name:
+                    online = peer_info.get("Online", False)
+                    last_seen = peer_info.get("LastSeen")
+                    
+                    if online:
+                        return {
+                            "online": True,
+                            "status": "active",
+                            "uptime": "Active",
+                            "last_seen": last_seen
+                        }
+                    else:
+                        return {
+                            "online": False,
+                            "status": "offline",
+                            "uptime": "N/A",
+                            "last_seen": last_seen
+                        }
+            
+            # Device not found in peer list
+            return {
+                "online": False,
+                "status": "device not found in tailscale network",
+                "uptime": "N/A"
+            }
+            
+        except subprocess.TimeoutExpired:
+            return {
+                "online": False,
+                "status": "tailscale status timeout",
+                "uptime": "N/A"
+            }
+        except Exception as e:
+            return {
+                "online": False,
+                "status": f"error checking tailscale: {str(e)[:50]}",
+                "uptime": "N/A"
+            }
     
     def get_docker_stats(self) -> Dict:
         """Get Docker container resource usage"""

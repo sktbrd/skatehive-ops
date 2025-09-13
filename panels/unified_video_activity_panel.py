@@ -138,6 +138,13 @@ def create_unified_video_activity_panel():
             # Format user with HP
             user = log.get('user', log.get('creator', 'anonymous'))[:11]
             user_hp = log.get('userHP', 0)
+            
+            # Ensure userHP is numeric
+            try:
+                user_hp = float(user_hp) if user_hp is not None else 0
+            except (ValueError, TypeError):
+                user_hp = 0
+                
             if user_hp > 0:
                 hp_emoji = '🔥' if user_hp > 200 else '⚡' if user_hp > 100 else '💫'
                 user = f"{user} {hp_emoji}"
@@ -173,6 +180,11 @@ def create_unified_video_activity_panel():
             
             # Format duration
             duration_ms = log.get('duration', 0)
+            try:
+                duration_ms = float(duration_ms) if duration_ms is not None else 0
+            except (ValueError, TypeError):
+                duration_ms = 0
+                
             if duration_ms > 0:
                 duration_str = f"{duration_ms/1000:.1f}s"
             else:

@@ -111,14 +111,26 @@ class UnifiedVideoActivityMonitor:
             if isinstance(result, list):
                 all_logs.extend(result)
         
-        # Sort by timestamp (newest first)
+        # Sort by timestamp (newest first) with detailed error handling
         def safe_timestamp_sort(log):
             timestamp = log.get('timestamp', '')
             if not timestamp:
                 return '1970-01-01T00:00:00Z'  # Default very old timestamp
+            if not isinstance(timestamp, str):
+                # Convert non-string timestamps to string
+                return str(timestamp)
             return timestamp
         
-        all_logs.sort(key=safe_timestamp_sort, reverse=True)
+        try:
+            all_logs.sort(key=safe_timestamp_sort, reverse=True)
+        except Exception as e:
+            # If sorting still fails, log the error and use unsorted logs
+            print(f"Warning: Failed to sort logs: {e}")
+            # Try to identify problematic log entries
+            for i, log in enumerate(all_logs):
+                ts = log.get('timestamp', 'MISSING')
+                print(f"Log {i}: timestamp={ts}, type={type(ts)}")
+            # Continue with unsorted logs
         
         # Keep last 20 operations across all services
         self.unified_logs = all_logs[:20]

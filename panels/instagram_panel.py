@@ -19,7 +19,7 @@ from rich.align import Align
 def get_instagram_logs():
     """Fetch Instagram download logs from the service"""
     try:
-        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/download/logs", timeout=10)
+        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/instagram/logs", timeout=10)
         if response.status_code == 200:
             return response.json()
         return {"logs": [], "error": f"HTTP {response.status_code}"}
@@ -38,7 +38,7 @@ def create_instagram_panel(monitor):
     
     try:
         # Check Instagram service health
-        tailscale_health = check_service_health("https://raspberrypi.tail83ea3e.ts.net/download")
+        tailscale_health = check_service_health("https://raspberrypi.tail83ea3e.ts.net/instagram")
         render_health = check_service_health("https://skate-insta.onrender.com")
         
         # Service Status
@@ -148,7 +148,7 @@ def check_service_health(url):
 def check_cookie_expiry():
     """Check Instagram cookie expiry status"""
     try:
-        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/download/cookies/status", timeout=10)
+        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/instagram/cookies/status", timeout=10)
         if response.status_code == 200:
             data = response.json()
             
@@ -236,7 +236,7 @@ def create_instagram_logs_panel(monitor):
     """Create Instagram download logs panel (similar to video transcoder)"""
     try:
         # Get Instagram logs
-        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/download/logs", timeout=10)
+        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/instagram/logs", timeout=10)
         if response.status_code != 200:
             return Panel(
                 Align.center("❌ Could not fetch Instagram logs"),

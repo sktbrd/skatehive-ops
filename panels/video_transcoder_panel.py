@@ -73,7 +73,7 @@ def create_video_transcoder_panel(monitor, title: str = "📹 Video Transcoder")
         import requests
         
         # Fetch logs from video-worker service via Tailscale Funnel
-        response = requests.get('https://raspberrypi.tail83ea3e.ts.net/transcode/logs?limit=10', timeout=10)
+        response = requests.get('https://raspberrypi.tail83ea3e.ts.net/video/logs?limit=10', timeout=10)
         if response.status_code == 200:
             data = response.json()
             logs = data.get('logs', [])

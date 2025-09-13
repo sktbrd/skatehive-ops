@@ -21,7 +21,7 @@ class ServiceMonitor:
         
         self.services = {
             "nas": {
-                "url": f"{self.base_url}/",
+                "url": f"{self.base_url}/nas/",
                 "port": 80,
                 "container": "nginx",  # or "openmediavault" if that's the container name
                 "check_type": "http_status",

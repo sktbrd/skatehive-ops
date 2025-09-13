@@ -106,9 +106,10 @@ def create_responsive_layout() -> Layout:
         )
         
         layout["right"].split_column(
-            Layout(name="video_transcoder", size=15),
-            Layout(name="video_logs", size=10),
-            Layout(name="instagram_logs", size=12)
+            Layout(name="video_transcoder", size=13),
+            Layout(name="video_logs", size=8),
+            Layout(name="webapp_logs", size=10),
+            Layout(name="instagram_logs", size=10)
         )
     
     return layout

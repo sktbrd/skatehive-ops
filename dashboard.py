@@ -23,6 +23,7 @@ from panels.logs_panel import create_logs_panel
 from panels.video_transcoder_panel import create_video_transcoder_panel
 from panels.unified_video_activity_panel import create_unified_video_activity_panel
 from panels.instagram_panel import create_instagram_panel, create_instagram_logs_panel
+from panels.webapp_logs_panel import create_webapp_logs_panel, create_webapp_error_summary_panel
 # Utils
 from utils.layout import (
     create_dashboard_layout,
@@ -139,6 +140,11 @@ async def main():
                             layout["logs"].update(create_instagram_logs_panel(monitor))
                         except KeyError:
                             pass
+                    
+                    try:
+                        layout["webapp_logs"].update(create_webapp_logs_panel())
+                    except KeyError:
+                        pass
                     
                     try:
                         layout["instagram_logs"].update(create_instagram_logs_panel(monitor))

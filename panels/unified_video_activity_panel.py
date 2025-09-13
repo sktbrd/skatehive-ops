@@ -107,15 +107,15 @@ def create_unified_video_activity_panel():
         header = f"Services: {services_line}\n"
         header += f"Recent: {total_ops} ops • {successful}✅ {failed}❌ • {success_rate}% success\n"
         
-        # Create table for recent operations
+        # Create table for recent operations with optimized column widths
         table = Table(show_header=True, header_style="bold magenta", box=None, pad_edge=False)
-        table.add_column("Time", style="cyan", width=8)
-        table.add_column("Service", style="blue", width=8)
-        table.add_column("User", style="green", width=12)
-        table.add_column("Device", style="blue", width=8)
-        table.add_column("File", style="yellow", width=14)
-        table.add_column("Status", width=8)
-        table.add_column("Duration", style="blue", width=6)
+        table.add_column("Time", style="cyan", width=9)
+        table.add_column("Service", style="blue", width=10)
+        table.add_column("User", style="green", width=15)
+        table.add_column("Device", style="blue", width=10)
+        table.add_column("File", style="yellow", width=18)
+        table.add_column("Status", width=10)
+        table.add_column("Duration", style="blue", width=8)
         
         # Add recent operations from all services
         for log in logs[:8]:  # Show last 8 operations
@@ -135,8 +135,8 @@ def create_unified_video_activity_panel():
                 service_short = service_name
             service_display = f"{service_icon} {service_short}"
             
-            # Format user with HP
-            user = log.get('user', log.get('creator', 'anonymous'))[:11]
+            # Format user with HP (increased width from 12 to 15)
+            user = log.get('user', log.get('creator', 'anonymous'))[:14]
             user_hp = log.get('userHP', 0)
             
             # Ensure userHP is numeric
@@ -154,10 +154,10 @@ def create_unified_video_activity_panel():
             device_info = log.get('deviceInfo', 'unknown')
             device_display = parse_device_display(platform, device_info)
             
-            # Format filename
+            # Format filename (increased width from 14 to 18)
             filename = log.get('filename', log.get('file', 'unknown'))
-            if len(filename) > 13:
-                filename = filename[:10] + "..."
+            if len(filename) > 17:
+                filename = filename[:14] + "..."
             
             # Format status with emoji
             status = log.get('status', 'unknown')
@@ -201,6 +201,15 @@ def create_unified_video_activity_panel():
             )
         
         content = header + "\n" + str(table)
+        
+        # Debug: Let's see what the table looks like
+        from rich.console import Console
+        from io import StringIO
+        temp_console = Console(file=StringIO(), width=60)
+        temp_console.print(table)
+        table_str = temp_console.file.getvalue()
+        
+        content = header + "\n" + table_str
         
         # Update time info
         if last_update:

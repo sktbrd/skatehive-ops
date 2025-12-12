@@ -104,18 +104,23 @@ if NODE_NAME and TAILSCALE_HOSTNAME:
         "role": NODE_ROLE,
     }
 
-# Add other known nodes from OTHER_NODES list (format: "name:hostname:role")
+# Add other known nodes from OTHER_NODES list (format: "name:hostname:role" or "name:hostname:role:lan_ip:instagram_port")
 for node_str in OTHER_NODES:
     parts = node_str.split(':')
     if len(parts) >= 2:
         node_id = parts[0]
         hostname = parts[1]
         role = parts[2] if len(parts) > 2 else 'secondary'
+        lan_ip = parts[3] if len(parts) > 3 else None
+        instagram_port = int(parts[4]) if len(parts) > 4 else INSTAGRAM_DOWNLOADER_PORT
         if node_id not in SKATEHIVE_NODES:
             SKATEHIVE_NODES[node_id] = {
                 "name": node_id.replace('-', ' ').title(),
                 "hostname": hostname,
                 "role": role,
+                "lan_ip": lan_ip,
+                "instagram_port": instagram_port,
+                "video_port": VIDEO_TRANSCODER_PORT,
             }
 
 # Fallback defaults if no nodes configured at all

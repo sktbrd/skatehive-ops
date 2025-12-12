@@ -57,27 +57,43 @@ class ServiceMonitor:
         
         # Add other known nodes
         for node_id, node_info in SKATEHIVE_NODES.items():
-            hostname = node_info['hostname']
+            hostname = node_info.get('hostname', '')
+            lan_ip = node_info.get('lan_ip', '')
             if hostname and hostname != TAILSCALE_HOSTNAME:
+                # Prefer LAN IP if available for faster local network access
+                video_port = node_info.get('video_port', VIDEO_TRANSCODER_PORT)
+                instagram_port = node_info.get('instagram_port', INSTAGRAM_DOWNLOADER_PORT)
+                
+                if lan_ip:
+                    # Use LAN IP for direct local network access
+                    video_url = f"http://{lan_ip}:{video_port}/healthz"
+                    instagram_url = f"http://{lan_ip}:{instagram_port}/health"
+                else:
+                    # Fallback to Tailscale Funnel
+                    video_url = f"https://{hostname}{VIDEO_FUNNEL_PATH}/healthz"
+                    instagram_url = f"https://{hostname}{INSTAGRAM_FUNNEL_PATH}/health"
+                
                 self.services[f"{node_id}-video"] = {
-                    "url": f"https://{hostname}{VIDEO_FUNNEL_PATH}/healthz",
-                    "port": 443,
+                    "url": video_url,
+                    "port": video_port if lan_ip else 443,
                     "container": f"{node_id}-video-worker",
                     "check_type": "json_key",
                     "expected_key": "ok",
                     "expected_value": True,
-                    "remote": True,  # Mark as remote node
+                    "remote": True,
                     "node_name": node_info.get('name', node_id),
+                    "lan_ip": lan_ip,
                 }
                 self.services[f"{node_id}-instagram"] = {
-                    "url": f"https://{hostname}{INSTAGRAM_FUNNEL_PATH}/health",
-                    "port": 443,
+                    "url": instagram_url,
+                    "port": instagram_port if lan_ip else 443,
                     "container": f"{node_id}-ytipfs-worker",
                     "check_type": "json_key",
                     "expected_key": "status",
                     "expected_value": "ok",
-                    "remote": True,  # Mark as remote node
+                    "remote": True,
                     "node_name": node_info.get('name', node_id),
+                    "lan_ip": lan_ip,
                 }
 
         self.internet_speed = {"download": 0, "upload": 0, "ping": 0}

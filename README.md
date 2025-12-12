@@ -29,8 +29,8 @@ A beautiful terminal dashboard for real-time monitoring of Skatehive infrastruct
   - Monitors: Response time, Hive node connectivity, RC status
 
 **Raspberry Pi (Backup) - via Tailscale:**
-- **Video Transcoder** - `https://raspberrypi.tail83ea3e.ts.net/video/healthz`
-- **Instagram Downloader** - `https://raspberrypi.tail83ea3e.ts.net/instagram/health`
+- **Video Transcoder** - `https://vladsberry.tail83ea3e.ts.net/video/healthz`
+- **Instagram Downloader** - `https://vladsberry.tail83ea3e.ts.net/instagram/health`
 
 ### 📊 **Resource Tracking**
 - Docker container CPU usage monitoring
@@ -124,7 +124,7 @@ The dashboard automatically detects:
 
 **Monitored Endpoints:**
 - Mac Mini services: `https://minivlad.tail9656d3.ts.net`
-- Raspberry Pi services: `https://raspberrypi.tail83ea3e.ts.net`
+- Raspberry Pi services: `https://vladsberry.tail83ea3e.ts.net`
 - Local Docker API: `unix:///var/run/docker.sock`
 
 ## Troubleshooting

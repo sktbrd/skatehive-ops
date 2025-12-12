@@ -133,7 +133,7 @@ if not SKATEHIVE_NODES:
         },
         "raspberry": {
             "name": "Raspberry Pi",
-            "hostname": "raspberrypi.tail83ea3e.ts.net",
+            "hostname": "vladsberry.tail83ea3e.ts.net",
             "role": "secondary",
         },
     }

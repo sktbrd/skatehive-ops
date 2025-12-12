@@ -293,8 +293,8 @@ def create_error_monitor_panel(monitor) -> Panel:
         system_issues = 0
         try:
             # Check if services are responding
-            video_health = requests.get("https://raspberrypi.tail83ea3e.ts.net/transcode/healthz", timeout=5)
-            instagram_health = requests.get("https://raspberrypi.tail83ea3e.ts.net/download/health", timeout=5)
+            video_health = requests.get("https://vladsberry.tail83ea3e.ts.net/transcode/healthz", timeout=5)
+            instagram_health = requests.get("https://vladsberry.tail83ea3e.ts.net/download/health", timeout=5)
             
             if video_health.status_code != 200:
                 system_issues += 1
@@ -340,7 +340,7 @@ def create_error_monitor_panel(monitor) -> Panel:
 def get_recent_video_activity():
     """Get recent video transcoder activity"""
     try:
-        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/transcode/logs", timeout=5)
+        response = requests.get("https://vladsberry.tail83ea3e.ts.net/transcode/logs", timeout=5)
         if response.status_code == 200:
             data = response.json()
             logs = data.get('logs', [])
@@ -353,7 +353,7 @@ def get_recent_video_activity():
 def get_recent_instagram_activity():
     """Get recent Instagram downloader activity"""
     try:
-        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/download/logs", timeout=5)
+        response = requests.get("https://vladsberry.tail83ea3e.ts.net/download/logs", timeout=5)
         if response.status_code == 200:
             data = response.json()
             logs = data.get('logs', [])

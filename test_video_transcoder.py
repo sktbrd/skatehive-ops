@@ -11,7 +11,7 @@ import os
 import base64
 from datetime import datetime
 
-BASE_URL = "https://raspberrypi.tail83ea3e.ts.net/video"
+BASE_URL = "https://vladsberry.tail83ea3e.ts.net/video"
 
 def test_health_endpoint():
     """Test the health endpoint"""

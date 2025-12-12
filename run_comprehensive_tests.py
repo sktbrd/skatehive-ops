@@ -76,11 +76,11 @@ def test_endpoints_quickly():
     import requests
     
     endpoints = [
-        ("NAS", "https://raspberrypi.tail83ea3e.ts.net/nas/"),
-        ("Instagram Health", "https://raspberrypi.tail83ea3e.ts.net/instagram/health"),
-        ("Video Transcoder Health", "https://raspberrypi.tail83ea3e.ts.net/video/healthz"),
-        ("Instagram Logs", "https://raspberrypi.tail83ea3e.ts.net/instagram/logs"),
-        ("Video Transcoder Logs", "https://raspberrypi.tail83ea3e.ts.net/video/logs")
+        ("NAS", "https://vladsberry.tail83ea3e.ts.net/nas/"),
+        ("Instagram Health", "https://vladsberry.tail83ea3e.ts.net/instagram/health"),
+        ("Video Transcoder Health", "https://vladsberry.tail83ea3e.ts.net/video/healthz"),
+        ("Instagram Logs", "https://vladsberry.tail83ea3e.ts.net/instagram/logs"),
+        ("Video Transcoder Logs", "https://vladsberry.tail83ea3e.ts.net/video/logs")
     ]
     
     all_healthy = True
@@ -108,7 +108,7 @@ def generate_test_errors():
     # Test invalid Instagram URL
     try:
         response = requests.post(
-            "https://raspberrypi.tail83ea3e.ts.net/instagram/download",
+            "https://vladsberry.tail83ea3e.ts.net/instagram/download",
             json={"url": INVALID_INSTAGRAM_URL},
             timeout=10
         )
@@ -119,7 +119,7 @@ def generate_test_errors():
     # Test valid Instagram URL (to show successful download in logs)
     try:
         response = requests.post(
-            "https://raspberrypi.tail83ea3e.ts.net/instagram/download",
+            "https://vladsberry.tail83ea3e.ts.net/instagram/download",
             json={"url": TEST_INSTAGRAM_URL},
             timeout=10
         )
@@ -132,7 +132,7 @@ def generate_test_errors():
         files = {'video': ('invalid.mp4', b'not a video', 'video/mp4')}
         data = {'creator': 'error-test', 'userHP': '50'}
         response = requests.post(
-            "https://raspberrypi.tail83ea3e.ts.net/video/transcode",
+            "https://vladsberry.tail83ea3e.ts.net/video/transcode",
             files=files,
             data=data,
             timeout=10

@@ -42,9 +42,9 @@ def test_basic_endpoints():
     import requests
     
     endpoints = [
-        ("NAS", "https://raspberrypi.tail83ea3e.ts.net/"),
-        ("Instagram Health", "https://raspberrypi.tail83ea3e.ts.net/instagram/health"),
-        ("Video Transcoder Health", "https://raspberrypi.tail83ea3e.ts.net/video/healthz"),
+        ("NAS", "https://vladsberry.tail83ea3e.ts.net/"),
+        ("Instagram Health", "https://vladsberry.tail83ea3e.ts.net/instagram/health"),
+        ("Video Transcoder Health", "https://vladsberry.tail83ea3e.ts.net/video/healthz"),
     ]
     
     results = []
@@ -68,7 +68,7 @@ def main():
     print("🍓 SKATEHIVE SERVICES COMPREHENSIVE TEST SUITE")
     print("=" * 80)
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Testing Tailscale Funnel endpoint: https://raspberrypi.tail83ea3e.ts.net")
+    print(f"Testing Tailscale Funnel endpoint: https://vladsberry.tail83ea3e.ts.net")
     print("=" * 80)
     
     # Track results

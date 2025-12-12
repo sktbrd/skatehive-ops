@@ -11,7 +11,7 @@ from datetime import datetime
 
 def test_error_monitoring():
     """Test the error monitoring functionality"""
-    base_url = "https://raspberrypi.tail83ea3e.ts.net"
+    base_url = "https://vladsberry.tail83ea3e.ts.net"
     
     print("🧪 Testing Error Monitoring System")
     print("=" * 50)

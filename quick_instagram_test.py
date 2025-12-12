@@ -10,7 +10,7 @@ from datetime import datetime
 
 # Test URL - Easy to maintain
 TEST_URL = "https://www.instagram.com/p/DOCCkdVj0Iy/"
-BASE_URL = "https://raspberrypi.tail83ea3e.ts.net/download"
+BASE_URL = "https://vladsberry.tail83ea3e.ts.net/download"
 
 def quick_test():
     """Quick test of the Instagram downloader with test URL"""

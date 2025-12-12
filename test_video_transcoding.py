@@ -12,7 +12,7 @@ from datetime import datetime
 
 def test_video_transcoding():
     """Test video transcoding functionality with error monitoring"""
-    base_url = "https://raspberrypi.tail83ea3e.ts.net"
+    base_url = "https://vladsberry.tail83ea3e.ts.net"
     
     print("📹 Testing Video Transcoding Service")
     print("=" * 50)

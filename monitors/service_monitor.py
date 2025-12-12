@@ -168,6 +168,13 @@ class ServiceMonitor:
         self.speedtest_status = "Running test..."
         self.speedtest_error = None
         
+        # Prefer bundled virtualenv speedtest-cli to avoid Ookla rate limits
+        venv_speedtest = Path(__file__).resolve().parent.parent / "venv" / "bin" / "speedtest"
+        if venv_speedtest.exists():
+            preferred_cmd = [str(venv_speedtest), "--json"]
+        else:
+            preferred_cmd = None
+        
         # Try different speedtest commands
         commands_to_try = [
             ["speedtest", "--format=json"],
@@ -176,6 +183,9 @@ class ServiceMonitor:
             ["/usr/bin/speedtest", "--format=json"],
             ["/usr/local/bin/speedtest", "--format=json"]
         ]
+        
+        if preferred_cmd:
+            commands_to_try.insert(0, preferred_cmd)
         
         for cmd in commands_to_try:
             try:

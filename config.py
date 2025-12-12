@@ -83,19 +83,55 @@ INSTAGRAM_FUNNEL_PATH = _config.get('INSTAGRAM_FUNNEL_PATH', os.environ.get('INS
 OTHER_NODES_STR = _config.get('OTHER_NODES', os.environ.get('OTHER_NODES', ''))
 OTHER_NODES = [n.strip() for n in OTHER_NODES_STR.split(',') if n.strip()]
 
-# Known SkateHive Nodes (can be extended)
-SKATEHIVE_NODES = {
-    "macmini": {
-        "name": "Mac Mini M4",
-        "hostname": "minivlad.tail9656d3.ts.net",
-        "role": "primary",
-    },
-    "raspberry": {
-        "name": "Raspberry Pi",
-        "hostname": "raspberrypi.tail83ea3e.ts.net",
-        "role": "secondary",
-    },
-}
+# Known SkateHive Nodes - load from config or use defaults
+# These can be overridden by setting SKATEHIVE_NODES_JSON in skatehive.config
+_nodes_json = _config.get('SKATEHIVE_NODES_JSON', '')
+if _nodes_json:
+    try:
+        import json
+        SKATEHIVE_NODES = json.loads(_nodes_json)
+    except:
+        SKATEHIVE_NODES = {}
+else:
+    # Default nodes - used as fallback when config doesn't specify
+    SKATEHIVE_NODES = {}
+
+# Build nodes from current config and OTHER_NODES
+if NODE_NAME and TAILSCALE_HOSTNAME:
+    SKATEHIVE_NODES[NODE_NAME] = {
+        "name": _config.get('NODE_DISPLAY_NAME', NODE_NAME.replace('-', ' ').title()),
+        "hostname": TAILSCALE_HOSTNAME,
+        "role": NODE_ROLE,
+    }
+
+# Add other known nodes from OTHER_NODES list (format: "name:hostname:role")
+for node_str in OTHER_NODES:
+    parts = node_str.split(':')
+    if len(parts) >= 2:
+        node_id = parts[0]
+        hostname = parts[1]
+        role = parts[2] if len(parts) > 2 else 'secondary'
+        if node_id not in SKATEHIVE_NODES:
+            SKATEHIVE_NODES[node_id] = {
+                "name": node_id.replace('-', ' ').title(),
+                "hostname": hostname,
+                "role": role,
+            }
+
+# Fallback defaults if no nodes configured at all
+if not SKATEHIVE_NODES:
+    SKATEHIVE_NODES = {
+        "macmini": {
+            "name": "Mac Mini M4",
+            "hostname": "minivlad.tail9656d3.ts.net",
+            "role": "primary",
+        },
+        "raspberry": {
+            "name": "Raspberry Pi",
+            "hostname": "raspberrypi.tail83ea3e.ts.net",
+            "role": "secondary",
+        },
+    }
 
 # Computed URLs
 def get_local_url(service: str) -> str:

@@ -12,13 +12,23 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich import box
+import sys
+from pathlib import Path
+
+# Import configuration
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import (
+    TAILSCALE_HOSTNAME,
+    VIDEO_EXTERNAL_URL,
+    INSTAGRAM_EXTERNAL_URL,
+)
 
 
 class ErrorTracker:
     """Track and manage errors from both video transcoder and Instagram downloader"""
     
     def __init__(self):
-        self.base_url = "https://raspberrypi.tail83ea3e.ts.net"
+        self.base_url = f"https://{TAILSCALE_HOSTNAME}" if TAILSCALE_HOSTNAME else "http://localhost"
         self.error_cache = {
             'video_transcoder': [],
             'instagram_downloader': []

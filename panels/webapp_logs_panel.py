@@ -15,15 +15,24 @@ from rich.text import Text
 from rich import box
 
 
+# Import configuration
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import TAILSCALE_HOSTNAME
+
+
 class WebappErrorTracker:
     """Track and manage client-side errors from the webapp"""
     
     def __init__(self):
         # Try localhost first (for development), fallback to production URL
+        external_url = f"https://{TAILSCALE_HOSTNAME}" if TAILSCALE_HOSTNAME else None
         self.base_urls = [
             "http://localhost:3000",  # Development server
-            "https://minivlad.tail9656d3.ts.net"  # Production Mac Mini
         ]
+        if external_url:
+            self.base_urls.append(external_url)  # Production via Tailscale
         self.active_url = None
         self.error_cache = []
         self.last_error_check = None

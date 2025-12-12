@@ -10,6 +10,12 @@ from rich.table import Table
 from rich.text import Text
 from datetime import datetime
 import json
+import sys
+from pathlib import Path
+
+# Import configuration
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import VIDEO_EXTERNAL_URL, VIDEO_LOCAL_URL
 
 
 def parse_device_display(platform, device_info):
@@ -73,7 +79,8 @@ def create_video_transcoder_panel(monitor, title: str = "📹 Video Transcoder")
         import requests
         
         # Fetch logs from video-worker service via Tailscale Funnel
-        response = requests.get('https://raspberrypi.tail83ea3e.ts.net/video/logs?limit=10', timeout=10)
+        video_url = VIDEO_EXTERNAL_URL if VIDEO_EXTERNAL_URL else VIDEO_LOCAL_URL
+        response = requests.get(f'{video_url}/logs?limit=10', timeout=10)
         if response.status_code == 200:
             data = response.json()
             logs = data.get('logs', [])

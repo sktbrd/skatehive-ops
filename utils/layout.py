@@ -98,11 +98,10 @@ def create_responsive_layout() -> Layout:
         
         layout["left"].split_column(
             Layout(name="internet", size=7),
-            Layout(name="nas", size=7),
-            Layout(name="services", size=8),
+            Layout(name="services", size=10),
             Layout(name="error_monitor", size=10),
-            Layout(name="instagram", size=12),
-            Layout(name="hive_stats", size=10)
+            Layout(name="instagram", size=14),
+            Layout(name="hive_stats", size=12)
         )
         
         layout["right"].split_column(
@@ -135,8 +134,7 @@ def create_fullscreen_layout() -> Layout:
     # Top row with services
     layout["services_row"].split_row(
         Layout(name="internet", ratio=1),
-        Layout(name="nas", ratio=1),
-        Layout(name="services", ratio=1),
+        Layout(name="services", ratio=2),
         Layout(name="hive_stats", ratio=2)
     )
     

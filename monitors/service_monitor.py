@@ -13,45 +13,73 @@ from typing import Dict, List, Optional
 
 import requests
 
+# Import configuration
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import (
+    TAILSCALE_HOSTNAME,
+    VIDEO_TRANSCODER_PORT,
+    INSTAGRAM_DOWNLOADER_PORT,
+    VIDEO_FUNNEL_PATH,
+    INSTAGRAM_FUNNEL_PATH,
+    SKATEHIVE_NODES,
+    get_external_url,
+)
+
 
 class ServiceMonitor:
     def __init__(self):
-        # Public Tailscale Funnel endpoints
-        self.base_url = "https://raspberrypi.tail83ea3e.ts.net"
+        # Build URLs from configuration
+        self.base_url = f"https://{TAILSCALE_HOSTNAME}" if TAILSCALE_HOSTNAME else ""
         
-        self.services = {
-            "nas": {
-                "url": f"{self.base_url}/nas/",
-                "port": 80,
-                "container": "nginx",  # or "openmediavault" if that's the container name
-                "check_type": "http_status",
-                "expected_status": 200
-            },
-            "ytipfs-worker": {
-                "url": f"{self.base_url}/instagram/health",
-                "port": 6666,
+        # Build services dict dynamically from config
+        self.services = {}
+        
+        # Local services
+        if TAILSCALE_HOSTNAME:
+            self.services["ytipfs-worker"] = {
+                "url": f"{self.base_url}{INSTAGRAM_FUNNEL_PATH}/health",
+                "port": INSTAGRAM_DOWNLOADER_PORT,
                 "container": "ytipfs-worker",
                 "check_type": "json_key",
                 "expected_key": "status",
                 "expected_value": "ok"
-            },
-            "video-worker": {
-                "url": f"{self.base_url}/video/healthz",
-                "port": 8081,
+            }
+            self.services["video-worker"] = {
+                "url": f"{self.base_url}{VIDEO_FUNNEL_PATH}/healthz",
+                "port": VIDEO_TRANSCODER_PORT,
                 "container": "video-worker",
                 "check_type": "json_key",
                 "expected_key": "ok",
                 "expected_value": True
-            },
-            "macmini-video": {
-                "url": "https://minivlad.tail9656d3.ts.net/video/healthz",
-                "port": 443,
-                "container": "skatehive-video-transcoder-video-worker-1",
-                "check_type": "json_key",
-                "expected_key": "ok",
-                "expected_value": True
             }
-        }
+        
+        # Add other known nodes
+        for node_id, node_info in SKATEHIVE_NODES.items():
+            hostname = node_info['hostname']
+            if hostname and hostname != TAILSCALE_HOSTNAME:
+                self.services[f"{node_id}-video"] = {
+                    "url": f"https://{hostname}{VIDEO_FUNNEL_PATH}/healthz",
+                    "port": 443,
+                    "container": f"{node_id}-video-worker",
+                    "check_type": "json_key",
+                    "expected_key": "ok",
+                    "expected_value": True,
+                    "remote": True,  # Mark as remote node
+                    "node_name": node_info.get('name', node_id),
+                }
+                self.services[f"{node_id}-instagram"] = {
+                    "url": f"https://{hostname}{INSTAGRAM_FUNNEL_PATH}/health",
+                    "port": 443,
+                    "container": f"{node_id}-ytipfs-worker",
+                    "check_type": "json_key",
+                    "expected_key": "status",
+                    "expected_value": "ok",
+                    "remote": True,  # Mark as remote node
+                    "node_name": node_info.get('name', node_id),
+                }
+
         self.internet_speed = {"download": 0, "upload": 0, "ping": 0}
         self.last_speed_test = None
         self.speedtest_status = "Initializing..."  # Initial status
@@ -350,12 +378,17 @@ class ServiceMonitor:
             
             # Standard error handling for other services
             error_msg = str(e)
-            if "timeout" in error_msg.lower():
-                details = "Connection timeout"
+            is_remote = service.get("remote", False)
+            node_name = service.get("node_name", "Unknown")
+            
+            if "SSL" in error_msg or "ssl" in error_msg:
+                details = f"Funnel down ({node_name})" if is_remote else "SSL error"
+            elif "timeout" in error_msg.lower():
+                details = f"Funnel timeout ({node_name})" if is_remote else "Connection timeout"
             elif "connection" in error_msg.lower():
-                details = "Connection refused"
+                details = f"Funnel offline ({node_name})" if is_remote else "Connection refused"
             else:
-                details = f"Network error: {error_msg[:30]}"
+                details = f"Unreachable ({node_name})" if is_remote else f"Network error: {error_msg[:30]}"
                 
             return {
                 "status": "🔴 Down", 

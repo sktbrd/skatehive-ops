@@ -15,7 +15,6 @@ from rich.live import Live
 from monitors.service_monitor import ServiceMonitor
 from monitors.unified_video_monitor import get_unified_video_activity
 from panels.internet_panel import create_internet_panel
-from panels.nas_panel import create_nas_panel
 from panels.services_panel import create_services_panel
 from panels.error_monitor_panel import create_error_monitor_panel
 from panels.hive_stats_panel import create_hive_stats_panel
@@ -97,11 +96,6 @@ async def main():
                     
                     try:
                         layout["internet"].update(create_internet_panel(monitor))
-                    except KeyError:
-                        pass
-                    
-                    try:
-                        layout["nas"].update(create_nas_panel(monitor))
                     except KeyError:
                         pass
                     

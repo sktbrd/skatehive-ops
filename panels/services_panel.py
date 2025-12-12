@@ -11,10 +11,10 @@ from rich.table import Table
 def create_services_panel(monitor) -> Panel:
     """Create services status panel"""
     table = Table(show_header=True, header_style="bold cyan", padding=(0, 1), box=None)
-    table.add_column("Service", style="cyan", width=14)
+    table.add_column("Service", style="cyan", width=18)
     table.add_column("Status", style="green", width=8)
     table.add_column("Response", style="yellow", width=8)
-    table.add_column("Details", style="magenta", width=25)
+    table.add_column("Details", style="magenta", width=22)
     table.add_column("CPU", style="red", width=6)
     table.add_column("Memory", style="blue", width=8)
     

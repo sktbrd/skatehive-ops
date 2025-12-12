@@ -14,12 +14,30 @@ from rich.table import Table
 from rich.text import Text
 from rich import box
 from rich.align import Align
+import sys
+from pathlib import Path
+
+# Import configuration
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import (
+    TAILSCALE_HOSTNAME,
+    INSTAGRAM_FUNNEL_PATH,
+    INSTAGRAM_LOCAL_URL,
+    INSTAGRAM_EXTERNAL_URL,
+    SKATEHIVE_NODES,
+    NODE_NAME,
+)
+
+# Build URLs from config
+PRIMARY_INSTAGRAM_URL = INSTAGRAM_EXTERNAL_URL if INSTAGRAM_EXTERNAL_URL else INSTAGRAM_LOCAL_URL
+RENDER_INSTAGRAM_URL = "https://skate-insta.onrender.com"
 
 
 def get_instagram_logs():
     """Fetch Instagram download logs from the service"""
     try:
-        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/instagram/logs", timeout=10)
+        url = f"{PRIMARY_INSTAGRAM_URL}/logs" if PRIMARY_INSTAGRAM_URL else f"{INSTAGRAM_LOCAL_URL}/logs"
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             return response.json()
         return {"logs": [], "error": f"HTTP {response.status_code}"}
@@ -38,14 +56,15 @@ def create_instagram_panel(monitor):
     
     try:
         # Check Instagram service health
-        tailscale_health = check_service_health("https://raspberrypi.tail83ea3e.ts.net/instagram")
-        render_health = check_service_health("https://skate-insta.onrender.com")
+        tailscale_health = check_service_health(PRIMARY_INSTAGRAM_URL) if PRIMARY_INSTAGRAM_URL else {'status': False}
+        render_health = check_service_health(RENDER_INSTAGRAM_URL)
         
-        # Service Status
+        # Service Status - show current node
+        hostname_display = TAILSCALE_HOSTNAME if TAILSCALE_HOSTNAME else "localhost"
         table.add_row(
             "🌐 Primary Service",
             "🟢 UP" if tailscale_health['status'] else "🔴 DOWN",
-            f"raspberrypi.tail83ea3e.ts.net - {tailscale_health.get('version', 'Unknown')}"
+            f"{hostname_display} - {tailscale_health.get('version', tailscale_health.get('data', {}).get('version', 'Unknown'))}"
         )
         
         table.add_row(
@@ -148,7 +167,8 @@ def check_service_health(url):
 def check_cookie_expiry():
     """Check Instagram cookie expiry status"""
     try:
-        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/instagram/cookies/status", timeout=10)
+        url = f"{PRIMARY_INSTAGRAM_URL}/cookies/status" if PRIMARY_INSTAGRAM_URL else f"{INSTAGRAM_LOCAL_URL}/cookies/status"
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             data = response.json()
             
@@ -236,7 +256,8 @@ def create_instagram_logs_panel(monitor):
     """Create Instagram download logs panel (similar to video transcoder)"""
     try:
         # Get Instagram logs
-        response = requests.get("https://raspberrypi.tail83ea3e.ts.net/instagram/logs", timeout=10)
+        url = f"{PRIMARY_INSTAGRAM_URL}/logs" if PRIMARY_INSTAGRAM_URL else f"{INSTAGRAM_LOCAL_URL}/logs"
+        response = requests.get(url, timeout=10)
         if response.status_code != 200:
             return Panel(
                 Align.center("❌ Could not fetch Instagram logs"),

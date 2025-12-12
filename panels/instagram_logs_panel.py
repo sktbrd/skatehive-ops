@@ -12,12 +12,20 @@ from rich.table import Table
 from rich.text import Text
 from rich.align import Align
 from rich import box
+import sys
+from pathlib import Path
+
+# Import configuration
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import INSTAGRAM_LOCAL_URL, INSTAGRAM_EXTERNAL_URL
 
 
 def get_instagram_logs():
     """Fetch Instagram download logs"""
     try:
-        response = requests.get("http://localhost:6666/logs", timeout=5)
+        # Try external URL first, fall back to local
+        url = INSTAGRAM_EXTERNAL_URL if INSTAGRAM_EXTERNAL_URL else INSTAGRAM_LOCAL_URL
+        response = requests.get(f"{url}/logs", timeout=5)
         if response.status_code == 200:
             return response.json()
         return {"logs": [], "error": f"HTTP {response.status_code}"}

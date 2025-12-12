@@ -9,33 +9,49 @@ import asyncio
 from datetime import datetime
 from typing import Dict, List, Optional
 import json
+import sys
+from pathlib import Path
+
+# Import configuration
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import (
+    SKATEHIVE_NODES,
+    VIDEO_FUNNEL_PATH,
+)
 
 
 class UnifiedVideoActivityMonitor:
     def __init__(self):
-        self.video_services = {
-            "mac_mini": {
-                "name": "Mac Mini M4",
-                "endpoint": "https://minivlad.tail9656d3.ts.net/video/logs",
-                "health_endpoint": "https://minivlad.tail9656d3.ts.net/video/healthz",
-                "icon": "🖥️",
-                "color": "blue"
-            },
-            "raspberry_pi": {
-                "name": "Raspberry Pi",
-                "endpoint": "https://raspberrypi.tail83ea3e.ts.net/video/logs",
-                "health_endpoint": "https://raspberrypi.tail83ea3e.ts.net/video/healthz",
-                "icon": "🥧",
-                "color": "green"
-            },
-            "render_cloud": {
-                "name": "Render Cloud",
-                "endpoint": "https://skatehive-transcoder.onrender.com/logs",
-                "health_endpoint": "https://skatehive-transcoder.onrender.com/health",
-                "icon": "☁️",
-                "color": "purple"
-            }
+        # Build video services from config
+        self.video_services = {}
+        
+        # Add nodes from config
+        node_icons = {
+            "macmini": ("🖥️", "blue"),
+            "raspberry": ("🥧", "green"),
         }
+        
+        for node_id, node_info in SKATEHIVE_NODES.items():
+            hostname = node_info['hostname']
+            if hostname:
+                icon, color = node_icons.get(node_id, ("🖥️", "cyan"))
+                self.video_services[node_id] = {
+                    "name": node_info['name'],
+                    "endpoint": f"https://{hostname}{VIDEO_FUNNEL_PATH}/logs",
+                    "health_endpoint": f"https://{hostname}{VIDEO_FUNNEL_PATH}/healthz",
+                    "icon": icon,
+                    "color": color
+                }
+        
+        # Add Render Cloud as fallback (always available)
+        self.video_services["render_cloud"] = {
+            "name": "Render Cloud",
+            "endpoint": "https://skatehive-transcoder.onrender.com/logs",
+            "health_endpoint": "https://skatehive-transcoder.onrender.com/health",
+            "icon": "☁️",
+            "color": "purple"
+        }
+        
         self.unified_logs = []
         self.service_status = {}
         self.last_update = None

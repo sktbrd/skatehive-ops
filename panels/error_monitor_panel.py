@@ -21,6 +21,8 @@ from config import (
     TAILSCALE_HOSTNAME,
     VIDEO_EXTERNAL_URL,
     INSTAGRAM_EXTERNAL_URL,
+    VIDEO_FUNNEL_PATH,
+    INSTAGRAM_FUNNEL_PATH,
 )
 
 
@@ -41,7 +43,7 @@ class ErrorTracker:
     def get_video_transcoder_errors(self) -> List[Dict]:
         """Get recent errors from video transcoder"""
         try:
-            response = requests.get(f"{self.base_url}/transcode/logs", timeout=10)
+            response = requests.get(f"{self.base_url}{VIDEO_FUNNEL_PATH}/logs", timeout=10)
             if response.status_code == 200:
                 data = response.json()
                 logs = data.get('logs', [])  # Fix: Extract logs array from response
@@ -75,7 +77,7 @@ class ErrorTracker:
     def get_instagram_downloader_errors(self) -> List[Dict]:
         """Get recent errors from Instagram downloader"""
         try:
-            response = requests.get(f"{self.base_url}/download/logs", timeout=10)
+            response = requests.get(f"{self.base_url}{INSTAGRAM_FUNNEL_PATH}/logs", timeout=10)
             if response.status_code == 200:
                 data = response.json()
                 logs = data.get('logs', [])
@@ -292,9 +294,9 @@ def create_error_monitor_panel(monitor) -> Panel:
         # System Health
         system_issues = 0
         try:
-            # Check if services are responding
-            video_health = requests.get("https://vladsberry.tail83ea3e.ts.net/transcode/healthz", timeout=5)
-            instagram_health = requests.get("https://vladsberry.tail83ea3e.ts.net/download/health", timeout=5)
+            # Check if services are responding using config URLs
+            video_health = requests.get(f"{VIDEO_EXTERNAL_URL}/healthz", timeout=5)
+            instagram_health = requests.get(f"{INSTAGRAM_EXTERNAL_URL}/health", timeout=5)
             
             if video_health.status_code != 200:
                 system_issues += 1
@@ -340,7 +342,7 @@ def create_error_monitor_panel(monitor) -> Panel:
 def get_recent_video_activity():
     """Get recent video transcoder activity"""
     try:
-        response = requests.get("https://vladsberry.tail83ea3e.ts.net/transcode/logs", timeout=5)
+        response = requests.get(f"{VIDEO_EXTERNAL_URL}/logs", timeout=5)
         if response.status_code == 200:
             data = response.json()
             logs = data.get('logs', [])
@@ -353,7 +355,7 @@ def get_recent_video_activity():
 def get_recent_instagram_activity():
     """Get recent Instagram downloader activity"""
     try:
-        response = requests.get("https://vladsberry.tail83ea3e.ts.net/download/logs", timeout=5)
+        response = requests.get(f"{INSTAGRAM_EXTERNAL_URL}/logs", timeout=5)
         if response.status_code == 200:
             data = response.json()
             logs = data.get('logs', [])

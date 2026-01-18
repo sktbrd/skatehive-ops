@@ -128,7 +128,7 @@ if not SKATEHIVE_NODES:
     SKATEHIVE_NODES = {
         "macmini": {
             "name": "Mac Mini M4",
-            "hostname": "minivlad.tail9656d3.ts.net",
+            "hostname": "minivlad.tail83ea3e.ts.net",
             "role": "primary",
         },
         "raspberry": {

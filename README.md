@@ -13,17 +13,17 @@ A beautiful terminal dashboard for real-time monitoring of Skatehive infrastruct
 ### 🚀 **Service Health Monitoring**
 
 **Mac Mini M4 (Primary) - via Tailscale Funnel:**
-- **Video Transcoder** - `https://minivlad.tail9656d3.ts.net/video/healthz`
+- **Video Transcoder** - `https://minivlad.tail83ea3e.ts.net/video/healthz`
   - Port: 8081 (external), 8080 (internal)
   - Container: `video-worker`
   - Monitors: Response time, uptime, processing statistics
 
-- **Instagram Downloader** - `https://minivlad.tail9656d3.ts.net/instagram/health`
+- **Instagram Downloader** - `https://minivlad.tail83ea3e.ts.net/instagram/health`
   - Port: 6666 (external), 8000 (internal)
   - Container: `ytipfs-worker`
   - Monitors: Response time, cookie status, expiration tracking
 
-- **Account Manager** - `https://minivlad.tail9656d3.ts.net/healthz`
+- **Account Manager** - `https://minivlad.tail83ea3e.ts.net/healthz`
   - Port: 3001
   - Container: `skatehive-account-manager`
   - Monitors: Response time, Hive node connectivity, RC status
@@ -123,7 +123,7 @@ The dashboard automatically detects:
 - Network connectivity status
 
 **Monitored Endpoints:**
-- Mac Mini services: `https://minivlad.tail9656d3.ts.net`
+- Mac Mini services: `https://minivlad.tail83ea3e.ts.net`
 - Raspberry Pi services: `https://vladsberry.tail83ea3e.ts.net`
 - Local Docker API: `unix:///var/run/docker.sock`
 
@@ -135,7 +135,7 @@ The dashboard automatically detects:
 
 **Solution:**
 1. Check service is running: `docker ps`
-2. Test endpoint directly: `curl https://minivlad.tail9656d3.ts.net/video/healthz`
+2. Test endpoint directly: `curl https://minivlad.tail83ea3e.ts.net/video/healthz`
 3. Verify Tailscale: `tailscale status`
 4. Check Funnel: `tailscale funnel status`
 
@@ -163,7 +163,7 @@ The dashboard automatically detects:
 **Cause:** Instagram cookie expiration or authentication failure
 
 **Solution:**
-1. Check Instagram cookie status: `curl https://minivlad.tail9656d3.ts.net/instagram/health`
+1. Check Instagram cookie status: `curl https://minivlad.tail83ea3e.ts.net/instagram/health`
 2. Refresh cookies (see instagram-downloader README)
 3. Dashboard will automatically detect and display resolution
 
